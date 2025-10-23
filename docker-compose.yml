@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # X-foil 백엔드 서버
   xfoil-backend:
@@ -31,7 +29,7 @@ services:
   xfoil-frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.new
     container_name: xfoil-frontend
     ports:
       - "3000:3000"  # React 개발 서버

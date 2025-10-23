@@ -1,7 +1,7 @@
 # React 프론트엔드를 위한 멀티 스테이지 Dockerfile
 
 # 개발 단계
-FROM node:18-alpine as development
+FROM node:18-alpine AS development
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 의존성 설치
-RUN npm ci --only=production=false
+RUN npm install
 
 # 소스 코드 복사
 COPY . .
@@ -19,13 +19,13 @@ EXPOSE 3000
 CMD ["npm", "start"]
 
 # 빌드 단계
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
 # 패키지 파일 복사 및 설치
 COPY package*.json ./
-RUN npm ci --only=production=false
+RUN npm install
 
 # 소스 코드 복사
 COPY . .
@@ -34,16 +34,19 @@ COPY . .
 RUN npm run build
 
 # 프로덕션 단계
-FROM nginx:alpine as production
+FROM node:18-alpine AS development
 
-# 빌드된 파일을 nginx에 복사
-COPY --from=build /app/build /usr/share/nginx/html
+WORKDIR /app
 
-# nginx 설정 파일 복사
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
 
-# nginx 포트 노출
-EXPOSE 80
+# Copy the rest of the application
+COPY . .
 
-# nginx 실행
-CMD ["nginx", "-g", "daemon off;"]
+# Expose development server port
+EXPOSE 3000
+
+# Start development server
+CMD ["npm", "start"]
