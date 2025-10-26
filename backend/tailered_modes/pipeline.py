@@ -168,7 +168,7 @@ class TailoredModesPipeline:
         """Step 2: GAN 학습"""
         logger.info("\n[Step 2] Training GAN...")
         
-        from tailored_modes_gan import AirfoilGAN
+        from gan_generator import AirfoilGAN
         
         self.gan = AirfoilGAN(
             latent_dim=self.config.gan_latent_dim,
@@ -191,7 +191,7 @@ class TailoredModesPipeline:
         """Step 3: Geometric Validator 학습"""
         logger.info("\n[Step 3] Training Geometric Validator...")
         
-        from tailored_modes_validator import GeometricValidator
+        from geometric_validator import GeometricValidator
         
         self.validator = GeometricValidator(
             airfoil_dim=self.uiuc_airfoils.shape[1]
@@ -218,7 +218,7 @@ class TailoredModesPipeline:
             logger.info(f"Loading existing samples from {samples_path}")
             self.tailored_samples = np.load(samples_path)
         else:
-            from tailored_modes_sampler import OptimalSampler, GeometricConstraints
+            from optimal_sampler import OptimalSampler, GeometricConstraints
             
             # Setup sampler
             self.sampler = OptimalSampler(

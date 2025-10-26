@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tailored Airfoil Optimization - Debug Interface</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛩️ Tailored Airfoil Optimization Platform</h1>
+            <p class="subtitle">Debug & Testing Interface</p>
+            <div class="status-bar">
+                <span class="status-indicator" id="connection-status">●</span>
+                <span id="connection-text">Connecting...</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Phase 1 Controls -->
+            <section class="phase-section">
+                <h2>Phase 1: Tailored Modal Parameterization</h2>
+                
+                <div class="step-grid">
+                    <!-- Step 1: Preprocessing -->
+                    <div class="step-card">
+                        <h3>Step 1: Preprocessing</h3>
+                        <p>Load and normalize UIUC airfoil database</p>
+                        <button class="btn btn-primary" onclick="runStep('preprocess')">
+                            Run Preprocessing
+                        </button>
+                        <div class="step-status" id="status-preprocess">
+                            <span class="status-badge">Pending</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: GAN Training -->
+                    <div class="step-card">
+                        <h3>Step 2: GAN Training</h3>
+                        <p>Train WGAN for airfoil generation</p>
+                        <div class="config-group">
+                            <label>Epochs: <input type="number" id="gan-epochs" value="100" min="10" max="2000"></label>
+                            <label>Batch Size: <input type="number" id="gan-batch" value="32" min="8" max="128"></label>
+                        </div>
+                        <button class="btn btn-primary" onclick="runStep('train_gan')">
+                            Train GAN
+                        </button>
+                        <div class="step-status" id="status-train_gan">
+                            <span class="status-badge">Pending</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Validator Training -->
+                    <div class="step-card">
+                        <h3>Step 3: Validator Training</h3>
+                        <p>Train CNN-based geometric validator</p>
+                        <div class="config-group">
+                            <label>Epochs: <input type="number" id="val-epochs" value="100" min="10" max="500"></label>
+                        </div>
+                        <button class="btn btn-primary" onclick="runStep('train_validator')">
+                            Train Validator
+                        </button>
+                        <div class="step-status" id="status-train_validator">
+                            <span class="status-badge">Pending</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Sample Generation -->
+                    <div class="step-card">
+                        <h3>Step 4: Sample Generation</h3>
+                        <p>Generate constrained airfoil samples</p>
+                        <div class="config-group">
+                            <label>N Samples: <input type="number" id="n-samples" value="500" min="10" max="2000"></label>
+                            <label>Max t/c: <input type="number" id="max-thickness" value="0.15" step="0.01" min="0.05" max="0.30"></label>
+                        </div>
+                        <button class="btn btn-primary" onclick="runStep('generate_samples')">
+                            Generate Samples
+                        </button>
+                        <div class="step-status" id="status-generate_samples">
+                            <span class="status-badge">Pending</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: Mode Extraction -->
+                    <div class="step-card">
+                        <h3>Step 5: Mode Extraction</h3>
+                        <p>Extract mode shapes via SVD</p>
+                        <div class="config-group">
+                            <label>N Modes: <input type="number" id="n-modes" value="15" min="5" max="50"></label>
+                        </div>
+                        <button class="btn btn-primary" onclick="runStep('extract_modes')">
+                            Extract Modes
+                        </button>
+                        <div class="step-status" id="status-extract_modes">
+                            <span class="status-badge">Pending</span>
+                        </div>
+                    </div>
+
+                    <!-- Run All -->
+                    <div class="step-card full-width">
+                        <h3>🚀 Run Full Pipeline</h3>
+                        <p>Execute all steps sequentially</p>
+                        <button class="btn btn-success" onclick="runFullPipeline()">
+                            Run Full Phase 1
+                        </button>
+                        <button class="btn btn-danger" onclick="resetPipeline()">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Progress Panel -->
+            <section class="progress-section">
+                <h2>Progress</h2>
+                <div class="progress-container">
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span id="progress-percentage">0%</span>
+                        <span id="progress-message">Idle</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Panel -->
+            <section class="results-section">
+                <h2>Results</h2>
+                <div id="results-panel" class="results-panel">
+                    <p class="placeholder">No results yet. Run pipeline steps to see results.</p>
+                </div>
+            </section>
+
+            <!-- Log Panel -->
+            <section class="log-section">
+                <h2>Console Log</h2>
+                <div class="log-controls">
+                    <button class="btn btn-sm" onclick="clearLog()">Clear</button>
+                    <label>
+                        <input type="checkbox" id="auto-scroll" checked> Auto-scroll
+                    </label>
+                </div>
+                <div class="log-panel" id="log-panel">
+                    <p class="log-entry info">[INFO] Debug interface loaded</p>
+                    <p class="log-entry info">[INFO] Waiting for connection to backend...</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Tailored Airfoil Optimization Platform v0.1.0</p>
+        </footer>
+    </div>
+
+    <script src="debug.js"></script>
+</body>
+</html>
