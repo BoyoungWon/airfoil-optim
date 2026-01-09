@@ -1,87 +1,39 @@
 services:
-  # X-foil 백엔드 서버
-  xfoil-backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: xfoil-backend
-    ports:
-      - "8000:8000"  # FastAPI 백엔드
-    volumes:
-      - ./data:/app/data
-      - ./results:/app/results
-      - ./airfoils:/app/airfoils
-    environment:
-      - PYTHONPATH=/app
-      - XFOIL_PATH=/app/xfoil6.99/bin/xfoil
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001
-    working_dir: /app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - xfoil-network
-
-  # React 프론트엔드 서버
-  xfoil-frontend:
+  # Main development environment with xfoil
+  xfoil-dev:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile.new
-    container_name: xfoil-frontend
-    ports:
-      - "3000:3000"  # React 개발 서버
+      context: .
+      dockerfile: Dockerfile
+    container_name: airfoil-optim-dev
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - /app/node_modules  # 익명 볼륨으로 node_modules 보호
+      - .:/workspace
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - REACT_APP_WS_URL=ws://localhost:8000
-      - CHOKIDAR_USEPOLLING=true  # 핫 리로드 지원
-      - WATCHPACK_POLLING=true
-    command: npm start
-    depends_on:
-      - xfoil-backend
-    networks:
-      - xfoil-network
+      - OMPI_ALLOW_RUN_AS_ROOT=1
+      - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    command: /bin/bash
 
-  # Redis (최적화 상태 캐싱 및 세션 관리)
-  redis:
-    image: redis:7-alpine
-    container_name: xfoil-redis
-    ports:
-      - "6379:6379"
+  # Optional: Jupyter notebook server for optimization development
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airfoil-optim-jupyter
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    networks:
-      - xfoil-network
-
-  # Nginx 리버스 프록시 (프로덕션용)
-  nginx:
-    image: nginx:alpine
-    container_name: xfoil-nginx
+      - .:/workspace
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - xfoil-frontend
-      - xfoil-backend
-    networks:
-      - xfoil-network
-    profiles:
-      - production
-
-volumes:
-  redis_data:
+      - "8888:8888"
+    environment:
+      - OMPI_ALLOW_RUN_AS_ROOT=1
+      - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    working_dir: /workspace
+    command: >
+      bash -c "source /opt/conda/etc/profile.d/conda.sh &&
+               conda activate airfoil-optim-env &&
+               jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root"
 
 networks:
-  xfoil-network:
-    driver: bridge
-    
+  default:
+    name: airfoil-optim-network

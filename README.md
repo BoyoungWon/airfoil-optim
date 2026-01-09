@@ -1,193 +1,184 @@
-# Tailored Airfoil Optimization Platform
+# Airfoil Optimization
 
-Deep learning-based airfoil design optimization using tailored modal parameterization and XFOIL integration.
+Airfoil 최적화를 위한 Docker 기반 개발 환경입니다. XFOIL을 사용한 airfoil 해석 및 최적화 기능을 제공합니다.
 
-## Overview
+## 환경 구성
 
-This platform implements a two-phase approach for low Reynolds number airfoil optimization:
+### 필수 요구사항
 
-- **Phase 1**: Tailored Modal Parameterization using GANs and SVD
-- **Phase 2**: XFOIL-based aerodynamic optimization with NURBS representation
+- Docker
+- Docker Compose
 
-## Project Structure
+### 빠른 시작
 
-```
-project/
-├── backend/
-│   ├── api/
-│   │   └── main.py              # FastAPI backend server
-│   ├── tailored_modes/          # Phase 1: Modal parameterization
-│   │   ├── preprocessing.py     # UIUC database preprocessing
-│   │   ├── gan_generator.py     # WGAN-GP airfoil generator
-│   │   ├── geometric_validator.py # CNN-based validity checker
-│   │   ├── optimal_sampler.py   # Constrained sampling
-│   │   ├── mode_extractor.py    # SVD mode extraction
-│   │   └── pipeline.py          # Full pipeline orchestration
-│   ├── xfoil_wrapper.py         # Phase 2: XFOIL interface
-│   └── nurbs_airfoil.py         # NURBS airfoil generation
-├── debug/
-│   ├── index.html               # Debug/test interface
-│   ├── style.css                # Interface styling
-│   └── debug.js                 # WebSocket & API client
-├── data/
-│   ├── uiuc_airfoils/          # Input: UIUC airfoil database
-│   └── outputs/                 # Output: Generated modes and models
-├── requirements.txt
-└── README.md
-```
-
-## Quick Start
-
-### 1. Installation
+1. **Docker 이미지 빌드 및 컨테이너 시작**
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Prepare data directory
-mkdir -p data/uiuc_airfoils data/outputs
+docker-compose up -d xfoil-dev
 ```
 
-### 2. Run Backend
+2. **개발 컨테이너 접속**
 
 ```bash
-cd backend/api
-python main.py
+docker-compose exec xfoil-dev bash
 ```
 
-Backend will start on `http://localhost:8000`
-
-### 3. Open Debug Interface
-
-Open `debug/index.html` in a web browser or serve it:
+3. **XFOIL 실행 확인**
 
 ```bash
-cd debug
-python -m http.server 8080
+xfoil
 ```
 
-Then open `http://localhost:8080`
+### 서비스 구성
 
-## Usage
+#### xfoil-dev (메인 개발 환경)
 
-### Debug Interface
-
-The debug interface provides step-by-step execution and monitoring:
-
-1. **Step 1: Preprocessing** - Load and normalize UIUC airfoils
-2. **Step 2: GAN Training** - Train WGAN for airfoil generation
-3. **Step 3: Validator Training** - Train CNN-based geometric validator
-4. **Step 4: Sample Generation** - Generate constrained airfoil samples
-5. **Step 5: Mode Extraction** - Extract mode shapes via SVD
-
-Each step can be run individually or use "Run Full Phase 1" for sequential execution.
-
-### API Endpoints
-
-#### Status & Health
-- `GET /` - API information
-- `GET /health` - Health check
-- `GET /api/status` - Current pipeline status
-- `WS /ws` - WebSocket for real-time updates
-
-#### Phase 1 Operations
-- `POST /api/phase1/preprocess` - Run preprocessing
-- `POST /api/phase1/train_gan` - Train GAN
-  - Parameters: `epochs`, `batch_size`, `latent_dim`
-- `POST /api/phase1/train_validator` - Train validator
-  - Parameters: `epochs`, `batch_size`
-- `POST /api/phase1/generate_samples` - Generate samples
-  - Parameters: `n_samples`, `max_thickness`, `min_thickness`
-- `POST /api/phase1/extract_modes` - Extract modes
-  - Parameters: `n_modes`
-- `GET /api/phase1/results` - Get Phase 1 results
-
-#### Utilities
-- `GET /api/download/{filename}` - Download generated files
-- `POST /api/reset` - Reset pipeline state
-
-## Configuration
-
-### Phase 1 Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `n_points` | 251 | Surface points per airfoil |
-| `gan_epochs` | 1000 | GAN training epochs |
-| `gan_batch_size` | 32 | GAN batch size |
-| `gan_latent_dim` | 100 | Latent vector dimension |
-| `validator_epochs` | 100 | Validator training epochs |
-| `n_samples` | 500 | Samples to generate |
-| `n_modes` | 15 | Number of modes to extract |
-
-### Geometric Constraints
-
-| Constraint | Default | Description |
-|------------|---------|-------------|
-| `max_thickness` | 0.15 | Maximum thickness ratio (t/c) |
-| `min_thickness` | 0.08 | Minimum thickness ratio |
-| `min_area` | 0.9 × NACA0015 | Minimum cross-sectional area |
-
-## Data Requirements
-
-### Input
-- **UIUC Airfoil Database**: `.dat` files in `data/uiuc_airfoils/`
-  - Format: Space-separated x, y coordinates
-  - First line: Airfoil name (ignored)
-
-### Output
-- `uiuc_processed.npy` - Preprocessed airfoils
-- `gan_models/` - Trained GAN models
-- `validator_model.h5` - Trained validator model
-- `tailored_samples.npy` - Generated samples
-- `tailored_modes.npz` - Extracted mode shapes
-
-## Technical Details
-
-### Phase 1: Tailored Modal Parameterization
-
-1. **Preprocessing**: Normalize airfoils to unit chord, resample to 251 points using cosine distribution
-2. **GAN**: Wasserstein GAN with gradient penalty (WGAN-GP) for realistic airfoil generation
-3. **Validator**: CNN-based discriminator (4 conv layers, 64 filters) for geometric validity
-4. **Sampling**: SLSQP optimization to satisfy constraints while maintaining validity
-5. **Mode Extraction**: SVD on constraint-satisfied samples to extract modal basis
-
-### Architecture
-
-- **GAN Generator**: CNN with Conv1DTranspose layers, tanh activation
-- **GAN Critic**: 4 Conv1D layers, no activation (WGAN)
-- **Validator**: 4 Conv1D + Dense layers, sigmoid output
-
-## Development
-
-### Adding New Features
-
-1. Implement in respective module (`backend/tailored_modes/`)
-2. Add API endpoint in `backend/api/main.py`
-3. Update debug interface if needed
-
-### Testing
+XFOIL이 설치된 주 개발 환경입니다.
 
 ```bash
-# Run unit tests (if implemented)
-pytest tests/
+# 컨테이너 시작
+docker-compose up -d xfoil-dev
 
-# Manual testing via debug interface
-# or direct API calls
-curl -X POST http://localhost:8000/api/phase1/preprocess
+# 컨테이너 접속
+docker-compose exec xfoil-dev bash
+
+# 컨테이너 종료
+docker-compose down
 ```
 
-## Requirements
+#### jupyter (Jupyter Notebook 서버)
 
-- Python 3.8+
-- TensorFlow 2.13+
-- NumPy, SciPy, Matplotlib
-- FastAPI, Uvicorn
-- XFOIL (for Phase 2)
+최적화 알고리즘 개발을 위한 Jupyter Notebook 환경입니다.
 
-See `requirements.txt` for complete list.
+```bash
+# Jupyter 서버 시작
+docker-compose up -d jupyter
 
-## References
+# 브라우저에서 접속: http://localhost:8888
+# 토큰은 로그에서 확인
+docker-compose logs jupyter
+```
 
-Based on the paper:
-> "Low Reynolds number airfoil design optimization using deep learning-based tailored airfoil modes"
+## 프로젝트 구조
+
+```
+.
+├── xfoil/                  # XFOIL 소스 코드
+├── environment.yml         # Conda 환경 설정
+├── Dockerfile             # Docker 이미지 정의
+├── docker-compose.yml     # Docker Compose 설정
+└── README.md             # 본 문서
+```
+
+## 개발 환경 정보
+
+- **Base OS**: Ubuntu 22.04
+- **Fortran Compiler**: gfortran
+- **C/C++ Compiler**: gcc/g++
+- **Build System**: CMake
+- **Python**: 3.12 (Conda environment)
+- **Scientific Libraries**: NumPy, SciPy, MPI4py, Numba
+
+## 사용 예제
+
+### NACA Airfoil 생성
+
+```bash
+# 컨테이너 접속
+docker-compose exec xfoil-dev bash
+
+# 단일 NACA airfoil 생성
+python scripts/generate_naca_airfoil.py 0012
+
+# 여러 airfoil 일괄 생성
+python scripts/generate_naca_airfoil.py --batch
+
+# 생성된 파일 확인
+ls public/airfoil/
+```
+
+### XFOIL 기본 사용
+
+```bash
+# 컨테이너 접속
+docker-compose exec xfoil-dev bash
+
+# XFOIL 실행
+xfoil
+
+# XFOIL 명령어 예제 (XFOIL 프롬프트에서)
+# NACA 0012 airfoil 불러오기
+NACA 0012
+
+# 패널 생성
+PANE
+
+# 점성 해석 모드
+OPER
+
+# Reynolds 수 설정
+RE 1000000
+
+# 받음각 별 해석
+ASEQ 0 10 1
+```
+
+### Python에서 XFOIL 사용
+
+```python
+import subprocess
+import os
+
+# XFOIL 명령어 스크립트 생성
+commands = """
+NACA 0012
+PANE
+OPER
+VISC 1000000
+PACC
+polar.txt
+
+ASEQ 0 10 1
+
+QUIT
+"""
+
+# XFOIL 실행
+with open('xfoil_input.txt', 'w') as f:
+    f.write(commands)
+
+subprocess.run(['xfoil'], stdin=open('xfoil_input.txt'))
+```
+
+## 문제 해결
+
+### xfoil 명령어를 찾을 수 없는 경우
+
+```bash
+# xfoil 재빌드
+cd /workspace/xfoil
+rm -rf build
+mkdir build && cd build
+cmake ..
+make
+make install
+```
+
+### MPI 관련 오류
+
+```bash
+# MPI 환경 확인
+mpirun --version
+
+# 테스트 실행
+mpirun -np 4 python your_script.py
+```
+
+## 라이선스
+
+XFOIL: GNU General Public License v2.0
+
+## 참고 자료
+
+- [XFOIL 공식 웹사이트](http://web.mit.edu/drela/Public/web/xfoil/)
+- [XFOIL Documentation](xfoil/xfoil_doc.txt)
