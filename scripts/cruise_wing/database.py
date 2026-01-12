@@ -19,19 +19,26 @@ class NACADatabase:
     다양한 NACA 익형을 스캔하여 목표 조건에 가장 적합한 초기 설계 선정
     """
     
-    # 일반적인 NACA 4-digit 익형 목록
+    # 일반적인 NACA 4-digit 및 5-digit 익형 목록
     COMMON_NACA = [
-        # Symmetric (0% camber)
+        # 4-digit: Symmetric (0% camber)
         "0006", "0008", "0009", "0010", "0012", "0015", "0018", "0021", "0024",
-        # Low camber (1-2%)
+        # 4-digit: Low camber (1-2%)
         "1408", "1410", "1412",
         "2408", "2410", "2412", "2415", "2418", "2421",
-        # Medium camber (3-4%)
+        # 4-digit: Medium camber (3-4%)
         "3408", "3412", "3415",
         "4408", "4410", "4412", "4415", "4418", "4421",
-        # High camber (5-6%)
+        # 4-digit: High camber (5-6%)
         "5412", "5415",
         "6408", "6412", "6415",
+        # 5-digit: Low CL_design (0.3)
+        "23012", "23015", "23018", "23021",
+        # 5-digit: Medium CL_design (0.4-0.5)
+        "24012", "24015", "24018",
+        "25012", "25015",
+        # 5-digit: High CL_design (0.6)
+        "26012", "26015",
     ]
     
     def __init__(self, cache_dir: Optional[str] = None):
@@ -63,26 +70,49 @@ class NACADatabase:
     @staticmethod
     def parse_naca_code(naca_code: str) -> Dict:
         """
-        NACA 4-digit 코드 파싱
+        NACA 4-digit 또는 5-digit 코드 파싱
         
         Parameters
         ----------
         naca_code : str
-            NACA 코드 (예: "2412")
+            NACA 코드 (예: "2412" 또는 "23012")
             
         Returns
         -------
         dict
-            m (max camber), p (camber position), t (thickness)
+            series (4 or 5), m (max camber), p (camber position), t (thickness)
+            5-digit의 경우 cl_design도 포함
         """
-        if len(naca_code) != 4:
-            raise ValueError(f"Invalid NACA 4-digit code: {naca_code}")
-        
-        m = int(naca_code[0]) / 100  # Max camber as fraction of chord
-        p = int(naca_code[1]) / 10   # Position of max camber
-        t = int(naca_code[2:]) / 100 # Thickness as fraction of chord
-        
-        return {'m': m, 'p': p, 't': t, 'naca': naca_code}
+        if len(naca_code) == 4:
+            # NACA 4-digit
+            m = int(naca_code[0]) / 100  # Max camber as fraction of chord
+            p = int(naca_code[1]) / 10   # Position of max camber
+            t = int(naca_code[2:]) / 100 # Thickness as fraction of chord
+            
+            return {'series': 4, 'm': m, 'p': p, 't': t, 'naca': naca_code}
+            
+        elif len(naca_code) == 5:
+            # NACA 5-digit
+            cl_design = int(naca_code[0]) * 3 / 20  # Design lift coefficient
+            p_code = int(naca_code[1:3])  # Position code
+            t = int(naca_code[3:]) / 100  # Thickness as fraction of chord
+            
+            # Position lookup table (standard NACA 5-series)
+            position_table = {
+                10: 0.05, 15: 0.075, 20: 0.10, 25: 0.125,
+                30: 0.15, 35: 0.175, 40: 0.20, 45: 0.225, 50: 0.25
+            }
+            p = position_table.get(p_code, 0.15)  # Default to 15% if not found
+            
+            # Approximate m from cl_design (simplified)
+            m = cl_design / 6.0
+            
+            return {
+                'series': 5, 'm': m, 'p': p, 't': t, 
+                'cl_design': cl_design, 'naca': naca_code
+            }
+        else:
+            raise ValueError(f"Invalid NACA code: {naca_code} (must be 4 or 5 digits)")
     
     @staticmethod
     def encode_naca_code(m: float, p: float, t: float) -> str:
@@ -110,9 +140,9 @@ class NACADatabase:
         return f"{m_int}{p_int}{t_int:02d}"
     
     def generate_naca_coords(self, m: float, p: float, t: float, 
-                             n_points: int = 100) -> np.ndarray:
+                             n_points: int = 100, series: int = 4) -> np.ndarray:
         """
-        NACA 4-digit 익형 좌표 생성
+        NACA 4-digit 또는 5-digit 익형 좌표 생성
         
         Parameters
         ----------
@@ -124,6 +154,8 @@ class NACADatabase:
             Thickness (0.06-0.24)
         n_points : int
             Number of points per surface
+        series : int
+            NACA series (4 or 5)
             
         Returns
         -------
@@ -151,15 +183,37 @@ class NACADatabase:
             # Avoid division by zero
             p_safe = max(p, 0.01)
             
-            # Forward of max camber
-            mask_forward = x < p_safe
-            yc[mask_forward] = (m / p_safe**2) * (2*p_safe*x[mask_forward] - x[mask_forward]**2)
-            dyc_dx[mask_forward] = (2*m / p_safe**2) * (p_safe - x[mask_forward])
+            if series == 4:
+                # NACA 4-digit camber line
+                # Forward of max camber
+                mask_forward = x < p_safe
+                yc[mask_forward] = (m / p_safe**2) * (2*p_safe*x[mask_forward] - x[mask_forward]**2)
+                dyc_dx[mask_forward] = (2*m / p_safe**2) * (p_safe - x[mask_forward])
+                
+                # Aft of max camber
+                mask_aft = ~mask_forward
+                yc[mask_aft] = (m / (1-p_safe)**2) * ((1 - 2*p_safe) + 2*p_safe*x[mask_aft] - x[mask_aft]**2)
+                dyc_dx[mask_aft] = (2*m / (1-p_safe)**2) * (p_safe - x[mask_aft])
             
-            # Aft of max camber
-            mask_aft = ~mask_forward
-            yc[mask_aft] = (m / (1-p_safe)**2) * ((1 - 2*p_safe) + 2*p_safe*x[mask_aft] - x[mask_aft]**2)
-            dyc_dx[mask_aft] = (2*m / (1-p_safe)**2) * (p_safe - x[mask_aft])
+            elif series == 5:
+                # NACA 5-digit camber line (simplified mean line)
+                # Using approximate equations for 5-series
+                k1 = 15.957  # Constant for standard 5-series
+                mask_forward = x < p_safe
+                
+                # Forward of max camber
+                yc[mask_forward] = (k1 / 6) * (x[mask_forward]**3 - 3*p_safe*x[mask_forward]**2 + p_safe**2*(3-p_safe)*x[mask_forward])
+                dyc_dx[mask_forward] = (k1 / 6) * (3*x[mask_forward]**2 - 6*p_safe*x[mask_forward] + p_safe**2*(3-p_safe))
+                
+                # Aft of max camber
+                mask_aft = ~mask_forward
+                yc[mask_aft] = (k1 * p_safe**3 / 6) * (1 - x[mask_aft])
+                dyc_dx[mask_aft] = -(k1 * p_safe**3 / 6)
+                
+                # Scale to match desired m
+                if np.max(yc) > 0:
+                    yc = yc * (m / np.max(yc))
+                    dyc_dx = dyc_dx * (m / np.max(yc))
         
         # Angle
         theta = np.arctan(dyc_dx)
@@ -199,10 +253,13 @@ class NACADatabase:
         dict or None
             Analysis results
         """
-        from ..optimize.xfoil_interface import run_xfoil_analysis
+        from optimize.xfoil_interface import run_xfoil_analysis
         
         params = self.parse_naca_code(naca_code)
-        coords = self.generate_naca_coords(params['m'], params['p'], params['t'])
+        coords = self.generate_naca_coords(
+            params['m'], params['p'], params['t'], 
+            series=params.get('series', 4)
+        )
         
         result = run_xfoil_analysis(
             coords,
@@ -276,7 +333,7 @@ class NACADatabase:
             if verbose:
                 print(f"   Analyzing {len(missing)} new airfoils...")
             
-            from ..optimize.xfoil_interface import run_xfoil_analysis
+            from optimize.xfoil_interface import run_xfoil_analysis
             
             for i, naca in enumerate(missing):
                 if verbose and (i + 1) % 10 == 0:
@@ -436,10 +493,13 @@ class ExtendedNACADatabase(NACADatabase):
         dict
             Polar data with arrays of AoA, CL, CD, CM
         """
-        from ..optimize.xfoil_interface import run_polar_analysis
+        from optimize.xfoil_interface import run_polar_analysis
         
         params = self.parse_naca_code(naca_code)
-        coords = self.generate_naca_coords(params['m'], params['p'], params['t'])
+        coords = self.generate_naca_coords(
+            params['m'], params['p'], params['t'],
+            series=params.get('series', 4)
+        )
         
         aoa_list = np.arange(aoa_range[0], aoa_range[1] + aoa_step, aoa_step)
         

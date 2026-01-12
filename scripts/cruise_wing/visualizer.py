@@ -442,6 +442,27 @@ class OptimizationVisualizer:
         ax2 = fig.add_subplot(gs[0, 2])
         ax2.axis('off')
         
+        # Format values safely
+        initial_ld = initial_airfoil.get('L/D')
+        initial_cl = initial_airfoil.get('CL')
+        initial_cd = initial_airfoil.get('CD')
+        optimal_ld = optimal_airfoil.get('L/D')
+        optimal_cl = optimal_airfoil.get('CL')
+        optimal_cd = optimal_airfoil.get('CD')
+        
+        initial_ld_str = f"{initial_ld:.2f}" if initial_ld is not None else "N/A"
+        initial_cl_str = f"{initial_cl:.4f}" if initial_cl is not None else "N/A"
+        initial_cd_str = f"{initial_cd:.5f}" if initial_cd is not None else "N/A"
+        optimal_ld_str = f"{optimal_ld:.2f}" if optimal_ld is not None else "N/A"
+        optimal_cl_str = f"{optimal_cl:.4f}" if optimal_cl is not None else "N/A"
+        optimal_cd_str = f"{optimal_cd:.5f}" if optimal_cd is not None else "N/A"
+        
+        if initial_ld is not None and optimal_ld is not None and initial_ld > 0:
+            improvement = ((optimal_ld / initial_ld) - 1) * 100
+            improvement_str = f"{improvement:+.1f}%"
+        else:
+            improvement_str = "N/A"
+        
         summary_text = f"""
 OPTIMIZATION RESULTS
 ━━━━━━━━━━━━━━━━━━━━
@@ -452,20 +473,20 @@ Iterations: {result.n_iterations}
 INITIAL
 ━━━━━━━
 NACA: {initial_airfoil['name']}
-L/D: {initial_airfoil.get('L/D', 'N/A'):.2f}
-CL: {initial_airfoil.get('CL', 'N/A'):.4f}
-CD: {initial_airfoil.get('CD', 'N/A'):.5f}
+L/D: {initial_ld_str}
+CL: {initial_cl_str}
+CD: {initial_cd_str}
 
 OPTIMAL
 ━━━━━━━
 NACA: {optimal_airfoil['name']}
-L/D: {optimal_airfoil.get('L/D', 'N/A'):.2f}
-CL: {optimal_airfoil.get('CL', 'N/A'):.4f}
-CD: {optimal_airfoil.get('CD', 'N/A'):.5f}
+L/D: {optimal_ld_str}
+CL: {optimal_cl_str}
+CD: {optimal_cd_str}
 
 IMPROVEMENT
 ━━━━━━━━━━━
-ΔL/D: {((optimal_airfoil.get('L/D', 0) / initial_airfoil.get('L/D', 1)) - 1) * 100:+.1f}%
+ΔL/D: {improvement_str}
 """
         ax2.text(0.1, 0.95, summary_text, transform=ax2.transAxes,
                 fontsize=10, fontfamily='monospace',
@@ -497,16 +518,17 @@ IMPROVEMENT
         # 5. Bar comparison (middle right)
         ax5 = fig.add_subplot(gs[1, 2])
         metrics = ['L/D', 'CL', 'CD×1000']
-        initial_vals = [
-            initial_airfoil.get('L/D', 0),
-            initial_airfoil.get('CL', 0),
-            initial_airfoil.get('CD', 0) * 1000
-        ]
-        optimal_vals = [
-            optimal_airfoil.get('L/D', 0),
-            optimal_airfoil.get('CL', 0),
-            optimal_airfoil.get('CD', 0) * 1000
-        ]
+        
+        # Safely get values with default 0
+        initial_ld = initial_airfoil.get('L/D') or 0
+        initial_cl = initial_airfoil.get('CL') or 0
+        initial_cd = initial_airfoil.get('CD') or 0
+        optimal_ld = optimal_airfoil.get('L/D') or 0
+        optimal_cl = optimal_airfoil.get('CL') or 0
+        optimal_cd = optimal_airfoil.get('CD') or 0
+        
+        initial_vals = [initial_ld, initial_cl, initial_cd * 1000]
+        optimal_vals = [optimal_ld, optimal_cl, optimal_cd * 1000]
         
         x = np.arange(len(metrics))
         width = 0.35

@@ -90,10 +90,10 @@ class CruiseWingConfig:
         design_points = []
         for dp in data.get('design_points', []):
             design_points.append(DesignPoint(
-                reynolds=dp['reynolds'],
-                aoa=dp['aoa'],
-                mach=dp.get('mach', 0.0),
-                weight=dp.get('weight', 1.0),
+                reynolds=float(dp['reynolds']),
+                aoa=float(dp['aoa']),
+                mach=float(dp.get('mach', 0.0)),
+                weight=float(dp.get('weight', 1.0)),
                 name=dp.get('name', 'design_point')
             ))
         
@@ -316,6 +316,15 @@ class CruiseWingOptimizer:
             initial['m'], initial['p'], initial['t']
         )
         initial['name'] = f"NACA {initial['naca']}"
+        
+        # Calculate L/D if not available
+        if initial.get('L/D') is None:
+            result = self._evaluate_design(np.array([initial['m'], initial['p'], initial['t']]))
+            if result and 'L/D' in result:
+                initial['L/D'] = result['L/D']
+                initial['CL'] = result.get('CL')
+                initial['CD'] = result.get('CD')
+                initial['CM'] = result.get('CM')
         
         elapsed = time.time() - start_time
         
@@ -695,17 +704,32 @@ class CruiseWingOptimizer:
             print("="*60)
             print(f"Total time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} min)")
             print(f"\n📊 Results:")
-            print(f"   Initial: {self.initial_airfoil['name']}, L/D={self.initial_airfoil.get('L/D', 'N/A')}")
-            print(f"   Optimal: {self.optimal_airfoil['name']}, L/D={self.optimal_airfoil.get('L/D', 'N/A'):.2f}")
             
-            if self.initial_airfoil.get('L/D'):
-                improvement = (self.optimal_airfoil['L/D'] / self.initial_airfoil['L/D'] - 1) * 100
+            initial_ld = self.initial_airfoil.get('L/D')
+            optimal_ld = self.optimal_airfoil.get('L/D')
+            
+            initial_str = f"{initial_ld:.2f}" if initial_ld is not None else "N/A"
+            optimal_str = f"{optimal_ld:.2f}" if optimal_ld is not None else "N/A"
+            
+            print(f"   Initial: {self.initial_airfoil['name']}, L/D={initial_str}")
+            print(f"   Optimal: {self.optimal_airfoil['name']}, L/D={optimal_str}")
+            
+            if initial_ld is not None and optimal_ld is not None:
+                improvement = (optimal_ld / initial_ld - 1) * 100
                 print(f"   Improvement: {improvement:+.1f}%")
             
             print(f"\n📁 Output files saved to: {self.output_dir}")
         
+        # Determine overall success
+        overall_success = (
+            self.optimization_result is not None and 
+            self.optimal_airfoil is not None and 
+            self.optimal_airfoil.get('L/D') is not None and
+            self.optimal_airfoil.get('L/D') > 0
+        )
+        
         return WorkflowResult(
-            success=self.optimization_result.success,
+            success=overall_success,
             initial_airfoil=self.initial_airfoil,
             optimal_airfoil=self.optimal_airfoil,
             optimization_result=self.optimization_result,

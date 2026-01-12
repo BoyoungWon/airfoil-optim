@@ -141,13 +141,27 @@ Examples:
             result = optimizer.run(verbose=verbose)
         
         # Print final results
-        if result.success:
-            print(f"\n✓ Optimization successful!")
-            print(f"  Optimal airfoil: {result.optimal_airfoil['name']}")
-            print(f"  L/D: {result.optimal_airfoil.get('L/D', 'N/A'):.2f}")
+        optimal_ld = result.optimal_airfoil.get('L/D')
+        initial_ld = result.initial_airfoil.get('L/D')
+        
+        if result.success and optimal_ld is not None and optimal_ld > 0:
+            print(f"\n\u2713 Optimization successful!")
+            
+            # Format L/D values safely
+            initial_ld_str = f"{initial_ld:.2f}" if initial_ld is not None else "N/A"
+            optimal_ld_str = f"{optimal_ld:.2f}" if optimal_ld is not None else "N/A"
+            
+            print(f"  Initial airfoil: {result.initial_airfoil['name']}, L/D={initial_ld_str}")
+            print(f"  Optimal airfoil: {result.optimal_airfoil['name']}, L/D={optimal_ld_str}")
+            
+            if initial_ld is not None and optimal_ld is not None:
+                improvement = (optimal_ld / initial_ld - 1) * 100
+                print(f"  Improvement: {improvement:+.1f}%")
             return 0
         else:
             print(f"\n✗ Optimization failed")
+            if optimal_ld is not None:
+                print(f"  (but got L/D={optimal_ld:.2f})")
             return 1
             
     except FileNotFoundError as e:

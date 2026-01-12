@@ -54,8 +54,8 @@ parametrization:
     # 총 3개 변수 - 물리적 타당성 보장
     bounds:
       max_camber: [0.0, 6.0] # 0-6% chord (m × 100)
-      camber_pos: [2, 5] # 20-50% chord (p × 10)
-      thickness: [9, 18] # 9-18% chord (t × 100)
+      camber_pos: [1, 5] # 10-50% chord (p × 10)
+      thickness: [9, 20] # 9-20% chord (t × 100)
 
     initial: [2, 4, 12] # NACA 2412 - 일반적인 시작점
 
@@ -145,7 +145,7 @@ solver:
   # XFOIL 유효 범위 (Reliable Operating Envelope)
   valid_range:
     reynolds:
-      min: 5.0e4 # 50,000 - 저 Re에서 transition 예측 정확도 저하
+      min: 5.0e5 # 500,000 - 저 Re에서 transition 예측 정확도 저하
       max: 5.0e7 # 50,000,000 - 고 Re에서도 신뢰성 유지
       note: "Re < 50k는 laminar-dominant로 별도 검증 필요"
 
@@ -160,9 +160,9 @@ solver:
       note: "실속 근처 (CL_max 부근)는 정확도 저하"
 
   settings:
-    ncrit: 10 # Critical amplification factor (비행 조건)
-    n_panels: 160 # Panel 수 (정확도 vs 속도)
-    max_iter: 200 # 최대 반복 횟수
+    ncrit: 8 # Critical amplification factor (비행 조건)
+    n_panels: 240 # Panel 수 (정확도 vs 속도)
+    max_iter: 300 # 최대 반복 횟수
 
   # Ncrit 가이드라인
   ncrit_guide:

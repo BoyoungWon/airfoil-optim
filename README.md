@@ -1,12 +1,13 @@
 # Airfoil Optimization Framework
 
-Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL을 사용한 공력 해석과 다양한 형상 매개변수화 방법(NACA, CST, FFD)을 지원하며, Kriging, Neural Network 등의 surrogate model을 활용한 효율적인 최적화를 제공합니다.
+Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL 및 OpenFOAM을 사용한 공력 해석과 다양한 형상 매개변수화 방법(NACA, CST, FFD)을 지원하며, Kriging, Neural Network 등의 surrogate model을 활용한 효율적인 최적화를 제공합니다.
 
 ## 주요 기능
 
 - **다중 형상 매개변수화**: NACA (3 params), CST (8-30 params), FFD (15-100+ params)
+- **CFD 솔버**: XFOIL (2D panel method), OpenFOAM (3D RANS/LES)
 - **Surrogate 모델**: Kriging/GPR, Neural Network, Polynomial RSM
-- **최적화 알고리즘**: Scipy, Genetic Algorithm, Bayesian Optimization
+- **최적화 알고리즘**: SLSQP, NSGA-II, Bayesian Optimization
 - **다중 설계점 최적화**: 가중 평균 기반 multi-point optimization
 - **시나리오 기반 실행**: YAML 설정 파일로 간편한 최적화 실행
 
@@ -104,6 +105,9 @@ docker-compose down
 - **Build System**: CMake
 - **Python**: 3.12 (Conda environment)
 - **Scientific Libraries**: NumPy, SciPy, MPI4py, Numba
+- **CFD Solvers**:
+  - XFOIL (built from source) - 2D panel method
+  - OpenFOAM (optional, for 3D scenarios) - RANS/LES
 
 ## 빠른 시작
 
@@ -336,6 +340,104 @@ output:
 python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
 ```
 
+## 최적화 알고리즘
+
+### 1. SLSQP (Sequential Least Squares Programming)
+
+**현재 구현**: Cruise Wing, Control Surface
+
+- **적용 대상**: 단순 형상 (3-6 parameters), 단일 목적 최적화
+- **장점**:
+  - 빠른 수렴 (평균 20-50 iterations)
+  - 제약조건 처리 우수 (등식/부등식)
+  - Gradient 기반으로 정확한 최적해
+- **단점**:
+  - 국소 최적해에 갇힐 수 있음
+  - Smooth objective 필요
+  - 초기값에 민감
+- **권장 조합**: NACA + Kriging
+
+### 2. NSGA-II (Non-dominated Sorting Genetic Algorithm II)
+
+**라이브러리 추가됨**: pymoo
+
+- **적용 대상**: 중간 복잡도 (8-30 parameters), 다중 목적, 비선형
+- **장점**:
+  - 전역 탐색 (global search)
+  - 다중 목적 최적화 (Pareto front)
+  - 국소 최적해 회피
+  - Gradient-free (비미분 가능 함수 지원)
+- **단점**:
+  - 많은 evaluation 필요 (5,000-10,000)
+  - 수렴 속도 느림
+  - Surrogate 모델 필수
+- **권장 조합**: CST/FFD + Neural Network
+
+### 알고리즘 선택 가이드
+
+| 조건             | 추천 알고리즘 | 이유              |
+| ---------------- | ------------- | ----------------- |
+| Parameters ≤ 6   | **SLSQP**     | 빠른 수렴, 효율적 |
+| Parameters > 8   | **NSGA-II**   | 전역 탐색, robust |
+| 단일 목적        | **SLSQP**     | 정확한 최적해     |
+| 다중 목적        | **NSGA-II**   | Pareto front 제공 |
+| Smooth objective | **SLSQP**     | Gradient 활용     |
+| Non-convex space | **NSGA-II**   | 국소 최적해 회피  |
+| 빠른 프로토타입  | **SLSQP**     | 1-2시간 완료      |
+| 정밀 최적화      | **NSGA-II**   | 하루 소요 가능    |
+
+## 해석 솔버 (CFD Solver)
+
+### 1. XFOIL (2D Panel Method)
+
+**현재 구현**: Cruise Wing, Control Surface, High Lift, Low Speed
+
+- **적용 대상**: 2D 익형 해석, 빠른 프로토타입
+- **유효 범위**:
+  - Reynolds: 50,000 - 50,000,000
+  - Mach: 0 - 0.5 (압축성 보정)
+  - AoA: -10° - 15° (실속 전)
+- **장점**:
+  - 매우 빠름 (<1초/evaluation)
+  - 설치 간단, 경량
+  - 2D 정확도 우수
+- **단점**:
+  - 2D만 가능
+  - 실속 후 부정확
+  - 3D 효과 무시
+- **권장 사용**: 고정익 2D 단면 최적화
+
+### 2. OpenFOAM (3D RANS/LES)
+
+**향후 구현**: Propeller, Wind Turbine
+
+- **적용 대상**: 3D 유동, 회전익, 복잡한 형상
+- **난류 모델**:
+  - RANS: k-ω SST, Spalart-Allmaras
+  - LES: Smagorinsky, WALE
+- **장점**:
+  - 3D 유동 정확
+  - 회전 효과 반영
+  - 복잡한 경계조건
+- **단점**:
+  - 느림 (10분-1시간/evaluation)
+  - 높은 계산 비용
+  - Surrogate 필수
+- **권장 사용**: 프로펠러, 풍력 터빈, 3D 날개
+
+### 솔버 선택 가이드
+
+| 조건           | 추천 솔버    | 이유         |
+| -------------- | ------------ | ------------ |
+| 2D 익형 단면   | **XFOIL**    | 빠름, 정확   |
+| 3D 날개/회전익 | **OpenFOAM** | 3D 효과 필수 |
+| 빠른 반복      | **XFOIL**    | <1초/eval    |
+| 정밀 해석      | **OpenFOAM** | RANS/LES     |
+| Re < 50M       | **XFOIL**    | 신뢰 범위    |
+| 회전 유동      | **OpenFOAM** | 회전 프레임  |
+| 프로토타입     | **XFOIL**    | 1-2일 완료   |
+| 최종 검증      | **OpenFOAM** | 실제 조건    |
+
 ## 형상 매개변수화 방법
 
 ### 1. NACA (3 parameters)
@@ -361,35 +463,47 @@ python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
 
 ## 최적화 시나리오
 
-| 시나리오               | 카테고리 | 매개변수화 | Surrogate  | 목적          | 상태       |
-| ---------------------- | -------- | ---------- | ---------- | ------------- | ---------- |
-| `cruise_wing.yaml`     | 고정익   | NACA       | Kriging    | max L/D       | ✓ 구현완료 |
-| `high_lift.yaml`       | 고정익   | CST        | Neural Net | max CL_max    | 계획중     |
-| `low_speed.yaml`       | 고정익   | CST        | Kriging    | max CL^1.5/CD | 계획중     |
-| `propeller.yaml`       | 회전익   | FFD        | Neural Net | multi-point   | 계획중     |
-| `wind_turbine.yaml`    | 회전익   | CST        | Neural Net | max AEP       | 계획중     |
-| `control_surface.yaml` | 조종면   | NACA       | Kriging    | effectiveness | 계획중     |
+| 시나리오               | 카테고리 | 매개변수화  | Solver   | Surrogate  | Optimizer | 목적          | 상태       |
+| ---------------------- | -------- | ----------- | -------- | ---------- | --------- | ------------- | ---------- |
+| `cruise_wing.yaml`     | 고정익   | NACA (3)    | XFOIL    | Kriging    | SLSQP     | max L/D       | ✓ 구현완료 |
+| `control_surface.yaml` | 조종면   | NACA (3)    | XFOIL    | Kriging    | SLSQP     | effectiveness | 계획중     |
+| `high_lift.yaml`       | 고정익   | CST (12-20) | XFOIL    | Neural Net | NSGA-II   | max CL_max    | 계획중     |
+| `low_speed.yaml`       | 고정익   | CST (8-16)  | XFOIL    | Kriging    | NSGA-II   | max CL^1.5/CD | 계획중     |
+| `propeller.yaml`       | 회전익   | FFD (30-60) | OpenFOAM | Neural Net | NSGA-II   | multi-point   | 계획중     |
+| `wind_turbine.yaml`    | 회전익   | CST (20-30) | OpenFOAM | Neural Net | NSGA-II   | max AEP       | 계획중     |
 
 ## 필요 패키지
 
-### Cruise Wing 모듈 (구현완료)
+### 기본 패키지 (environment.yml에 포함)
 
 ```bash
-# 필수 패키지 (environment.yml에 포함)
-- scikit-learn (Kriging/GPR)
-- matplotlib (시각화)
-- pyyaml (설정 파일)
-- joblib (모델 저장)
+# Cruise Wing 모듈 (구현완료)
+- scikit-learn  # Kriging/GPR surrogate
+- matplotlib    # 시각화
+- pyyaml        # 설정 파일
+- joblib        # 모델 저장
+
+# 최적화 알고리즘
+- pymoo         # NSGA-II, NSGA-III (다목적 최적화)
+
+# OpenFOAM interface (향후 추가)
+- PyFoam (pip)  # OpenFOAM Python 래퍼
+- foampy (pip)  # OpenFOAM 후처리
 ```
 
-### 다른 시나리오용 추가 패키지
+### 향후 시나리오용 추가 패키지
 
 ```bash
-# 컨테이너 내부에서 설치
-pip install torch scikit-optimize
+# Neural Network surrogate
+pip install torch
+conda install -c conda-forge pytorch
 
-# 또는 conda 환경에 추가
-conda install -c conda-forge pytorch scikit-optimize
+# OpenFOAM (3D scenarios)
+# OpenFOAM은 Dockerfile에서 설치 또는
+sudo apt-get install openfoam
+
+# OpenFOAM Python tools
+pip install PyFoam foampy
 ```
 
 ## 문제 해결
