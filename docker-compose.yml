@@ -15,25 +15,6 @@ services:
     working_dir: /workspace
     command: /bin/bash
 
-  # Optional: Jupyter notebook server for optimization development
-  jupyter:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: airfoil-optim-jupyter
-    volumes:
-      - .:/workspace
-    ports:
-      - "8888:8888"
-    environment:
-      - OMPI_ALLOW_RUN_AS_ROOT=1
-      - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-    working_dir: /workspace
-    command: >
-      bash -c "source /opt/conda/etc/profile.d/conda.sh &&
-               conda activate airfoil-optim-env &&
-               jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root"
-
 networks:
   default:
     name: airfoil-optim-network

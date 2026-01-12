@@ -32,23 +32,23 @@ FFD는 제어점(control points) 격자를 사용하여 형상을 매개변수�
 
 ```bash
 # NACA baseline에서 랜덤 변형 생성
-python scripts/ffd_airfoil.py --naca 0012 --control-points 5 3 --amplitude 0.02 -o output/ffd_0012.dat
+python scripts/ffd_airfoil.py --naca 0012 --control-points 5 3 --amplitude 0.02 -o output/airfoil/ffd_0012.dat
 
 # 기존 airfoil 파일 변형
-python scripts/ffd_airfoil.py --input public/airfoil/naca2412.dat --control-points 4 3 --amplitude 0.01 -o output/ffd_2412.dat
+python scripts/ffd_airfoil.py --input public/airfoil/naca2412.dat --control-points 4 3 --amplitude 0.01 -o output/airfoil/ffd_2412.dat
 
 # 시각화 포함
-python scripts/ffd_airfoil.py --naca 0012 --control-points 6 3 --amplitude 0.03 -o output/ffd_test.dat --plot
+python scripts/ffd_airfoil.py --naca 0012 --control-points 6 3 --amplitude 0.03 -o output/airfoil/ffd_test.dat --plot
 ```
 
 #### 2. Surrogate model을 위한 다중 샘플 생성
 
 ```bash
 # 100개의 랜덤 샘플 생성
-python scripts/ffd_airfoil.py --naca 0012 --samples 100 --control-points 5 3 --amplitude 0.02 --output-dir output/naca0012_ffd
+python scripts/ffd_airfoil.py --naca 0012 --samples 100 --control-points 5 3 --amplitude 0.02 --output-dir output/airfoil/naca0012_ffd
 
 # 다른 Reynolds 수 범위를 위한 다양한 샘플
-python scripts/ffd_airfoil.py --naca 2412 --samples 200 --control-points 6 4 --amplitude 0.03 --output-dir output/naca2412_ffd --seed 123
+python scripts/ffd_airfoil.py --naca 2412 --samples 200 --control-points 6 4 --amplitude 0.03 --output-dir output/airfoil/naca2412_ffd --seed 123
 ```
 
 #### 3. 특정 변형 파라미터 적용
@@ -94,10 +94,10 @@ python scripts/ffd_airfoil.py --input custom.dat --control-points 5 3 --deformat
 
 ```bash
 # 1. 다양한 FFD 샘플 생성
-python scripts/ffd_airfoil.py --naca 0012 --samples 100 --control-points 5 3 --amplitude 0.03 --output-dir output/ffd_dataset
+python scripts/ffd_airfoil.py --naca 0012 --samples 100 --control-points 5 3 --amplitude 0.03 --output-dir output/airfoil/ffd_dataset
 
 # 2. 각 샘플에 대해 AoA sweep 수행
-for f in output/ffd_dataset/ffd_sample_*.dat; do
+for f in output/airfoil/ffd_dataset/ffd_sample_*.dat; do
     python scripts/aoa_sweep.py "$f" 1000000 -5 15 0.5
 done
 

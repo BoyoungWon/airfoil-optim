@@ -39,7 +39,9 @@ xfoil
 
 ### 서비스 구성
 
-**xfoil-dev**: XFOIL이 설치된 메인 개발 환경
+#### xfoil-dev (메인 개발 환경)
+
+XFOIL이 설치된 주 개발 환경입니다.
 
 ```bash
 # 컨테이너 시작
@@ -52,11 +54,16 @@ docker-compose exec xfoil-dev bash
 docker-compose down
 ```
 
-## 프로젝트 구조
+#### jupyter (Jupyter Notebook 서버)
 
-```
-.
-├── xfoil/                   # XFOIL 소스 코드
+최적화 알고리즘 개발을 위한 Jupyter Notebook 환경입니다.
+
+```bash
+# Jupyter 서버 시작
+docker-compose up -d jupyter
+
+# 브라우저에서 접속: http://localhost:8888
+# 토큰은 로그에서 확인 # XFOIL 소스 코드
 ├── scripts/                 # Python 스크립트
 │   ├── generate_naca_airfoil.py   # NACA airfoil 생성
 │   ├── ffd_airfoil.py             # FFD airfoil 생성
@@ -82,7 +89,15 @@ docker-compose down
 ├── environment.yml          # Conda 환경 설정
 ├── Dockerfile               # Docker 이미지 정의
 ├── docker-compose.yml       # Docker Compose 설정
-└── README.md                # 본 문서
+└── README.md gate/          # Surrogate model 학습 결과
+│   └── optimization/       # 최적화 결과
+├── public/airfoil/         # 공유 airfoil 저장소
+├── environment.yml         # Conda 환경 설정
+├── Dockerfile              # Docker 이미지 정의
+├── docker-compose.yml      # Docker Compose 설정
+├── FFD_Tutorial.ipynb      # FFD 학습용 Jupyter 노트북
+├── FFD_QUICKSTART.md       # FFD 빠른 시작 가이드
+└── README.md               # 본 문서
 ```
 
 ## 개발 환경 정보
@@ -90,11 +105,7 @@ docker-compose down
 - **Base OS**: Ubuntu 22.04
 - **Fortran Compiler**: gfortran
 - **C/C++ Compiler**: gcc/g++
-- **Build System**: CMake
-- **Python**: 3.12 (Conda environment)
-- **Scientific Libraries**: NumPy, SciPy, MPI4py, Numba
-
-## 빠른 시작
+- \*빠른 시작
 
 ### 1. 시나리오 검증
 
@@ -170,14 +181,14 @@ ls output/airfoil/ffd/
 
 ### 커스텀 시나리오 생성
 
-```yaml
+````yaml
 # scenarios/my_custom.yaml
 name: "Custom Airfoil Optimization"
 description: "My custom optimization scenario"
 category: "A. Fixed-Wing Aircraft"
 
 parametrization:
-  method: cst # naca, cst, or ffd
+  method: cst  # naca, cst, or ffd
   n_upper: 6
   n_lower: 6
 
@@ -203,39 +214,21 @@ optimization:
   convergence_tol: 1e-6
 
 surrogate:
-  method: kriging
-  kernel: matern
-  training_samples: 200
-  validation_split: 0.2
-
-output:
-  directory: "output/optimization/my_custom"
-```
-
-실행:
-
-```bash
-python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
-```
-
-## 형상 매개변수화 방법
+  m형상 매개변수화 방법
 
 ### 1. NACA (3 parameters)
-
 - **적용**: 간단한 익형 최적화, 초기 설계
 - **파라미터**: m (캠버), p (캠버 위치), t (두께)
 - **Surrogate**: Kriging/GPR 권장
 - **샘플 수**: 30-60개
 
 ### 2. CST (8-30 parameters)
-
 - **적용**: 일반적인 익형 최적화, 고양력 장치
 - **파라미터**: Bernstein polynomial 계수
 - **Surrogate**: Kriging 또는 Neural Network
 - **샘플 수**: 80-600개
 
 ### 3. FFD (15-100+ parameters)
-
 - **적용**: 복잡한 형상 최적화, 프로펠러, 터빈
 - **파라미터**: 제어점 변위 (nx × ny × 2)
 - **Surrogate**: Neural Network 권장
@@ -243,14 +236,14 @@ python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
 
 ## 최적화 시나리오
 
-| 시나리오               | 카테고리 | 매개변수화 | Surrogate  | 목적          |
-| ---------------------- | -------- | ---------- | ---------- | ------------- |
-| `cruise_wing.yaml`     | 고정익   | NACA       | Kriging    | max L/D       |
-| `high_lift.yaml`       | 고정익   | CST        | Neural Net | max CL_max    |
-| `low_speed.yaml`       | 고정익   | CST        | Kriging    | max CL^1.5/CD |
-| `propeller.yaml`       | 회전익   | FFD        | Neural Net | multi-point   |
-| `wind_turbine.yaml`    | 회전익   | CST        | Neural Net | max AEP       |
-| `control_surface.yaml` | 조종면   | NACA       | Kriging    | effectiveness |
+| 시나리오 | 카테고리 | 매개변수화 | Surrogate | 목적 |
+|---------|---------|-----------|-----------|-----|
+| `cruise_wing.yaml` | 고정익 | NACA | Kriging | max L/D |
+| `high_lift.yaml` | 고정익 | CST | Neural Net | max CL_max |
+| `low_speed.yaml` | 고정익 | CST | Kriging | max CL^1.5/CD |
+| `propeller.yaml` | 회전익 | FFD | Neural Net | multi-point |
+| `wind_turbine.yaml` | 회전익 | CST | Neural Net | max AEP |
+| `control_surface.yaml` | 조종면 | NACA | Kriging | effectiveness |
 
 ## 필요 패키지
 
@@ -260,7 +253,7 @@ pip install scikit-learn scikit-optimize torch pyyaml
 
 # 또는 conda 환경에 추가
 conda install -c conda-forge scikit-learn scikit-optimize pytorch pyyaml
-```
+````
 
 ## 문제 해결
 
@@ -283,7 +276,28 @@ cmake .. && make && make install
 
 - **초기값**: 실현 가능한 초기 설계 확인
 - **제약조건**: 너무 엄격한 제약 완화
-- **알고리즘**: Scipy → Genetic → Bayesian 순서로 시도
+- **알고리즘**: Scipy → Genetic → Bayesian 순서로 시도bash
+
+# xfoil 재빌드
+
+cd /workspace/xfoil
+rm -rf build
+mkdir build && cd build
+cmake ..
+make
+make install
+
+````
+
+### MPI 관련 오류
+
+```bash
+# MPI 환경 확인
+mpirun --version
+
+# 테스트 실행
+mpirun -np 4 python your_script.py
+````
 
 ## 라이선스
 
@@ -293,4 +307,3 @@ XFOIL: GNU General Public License v2.0
 
 - [XFOIL 공식 웹사이트](http://web.mit.edu/drela/Public/web/xfoil/)
 - [XFOIL Documentation](xfoil/xfoil_doc.txt)
-- [시나리오 설명서](scenarios/README.md)

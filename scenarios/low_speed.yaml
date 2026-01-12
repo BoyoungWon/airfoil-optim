@@ -1,0 +1,77 @@
+# Low-Speed High-Efficiency Optimization (UAV)
+# 저속 고효율 최적화 - UAV, 태양광 항공기
+
+name: "Low-Speed High-Efficiency Optimization"
+description: |
+  저 Reynolds 수 영역에서 고효율 익형 설계.
+  UAV, 고고도 정찰기, 태양광 항공기 등에 적용.
+  층류 유지 및 체공시간 극대화가 목표.
+
+category: "fixed_wing"
+application: "low_speed"
+
+parametrization:
+  method: "cst"
+  baseline: "e387" # Eppler 387 (저속 익형)
+  parameters:
+    n_upper: 8
+    n_lower: 8
+    bounds:
+      upper: [-0.2, 0.2]
+      lower: [-0.2, 0.2]
+
+design_points:
+  - name: "cruise"
+    reynolds: 2.0e5 # Re = 200k (소형 UAV)
+    aoa: 5.0
+    mach: 0.05
+    weight: 0.7
+
+  - name: "loiter"
+    reynolds: 1.5e5 # 체공 (더 낮은 속도)
+    aoa: 7.0
+    mach: 0.04
+    weight: 0.3
+
+objectives:
+  - type: "maximize"
+    metric: "CL^1.5/CD" # 항속시간 최적화
+    weight: 1.0
+
+constraints:
+  geometry:
+    - param: "thickness_ratio"
+      min: 0.08
+      max: 0.15
+    - param: "camber"
+      min: 0.02
+      max: 0.06
+
+  aerodynamic:
+    - param: "CL"
+      min: 0.6
+      max: 1.4
+    - param: "transition_upper"
+      min: 0.3 # 윗면 천이점 위치 (층류 유지)
+    - param: "CD"
+      max: 0.015 # 최대 항력계수
+
+optimization:
+  algorithm: "bayesian" # Bayesian Optimization
+  acquisition: "EI" # Expected Improvement
+  max_iterations: 80
+  initial_samples: 20
+
+surrogate:
+  method: "kriging"
+  kernel: "matern52"
+  nugget: 1e-6
+  training_samples: 200
+  validation_split: 0.15
+
+output:
+  directory: "output/optimization/low_speed"
+  save_history: true
+  plot_convergence: true
+  plot_transition: true
+  validate_with_xfoil: true

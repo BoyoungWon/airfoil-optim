@@ -1,0 +1,74 @@
+# Fixed-Wing Cruise Optimization
+# 순항 비행 최적화 - 순항 L/D 최대화
+
+name: "Cruise Wing Optimization"
+description: |
+  고정익 항공기의 순항 익형 최적화.
+  단일 설계점에서 양항비(L/D)를 최대화하여 순항 효율을 극대화.
+  일반 항공기, 글라이더, 소형 무인기 등에 적용 가능.
+
+category: "fixed_wing"
+application: "cruise_wing"
+
+# 형상 매개변수화
+parametrization:
+  method: "naca" # 초기 개념 설계 단계
+  baseline: "naca2412"
+  parameters:
+    # NACA 4-digit: [max_camber_percent, camber_position_tenth, thickness_percent]
+    bounds:
+      max_camber: [0.0, 6.0] # 0-6% camber
+      camber_pos: [2, 5] # 20-50% chord position
+      thickness: [9, 18] # 9-18% thickness
+    initial: [2, 4, 12] # NACA 2412
+
+# 설계점
+design_points:
+  - name: "cruise"
+    reynolds: 3.0e6 # Re = 3M (소형 항공기)
+    aoa: 3.0 # 순항 받음각 3도
+    mach: 0.2 # 저속 비행
+    weight: 1.0
+
+# 목적함수
+objectives:
+  - type: "maximize"
+    metric: "CL/CD"
+    weight: 1.0
+
+# 제약 조건
+constraints:
+  geometry:
+    - param: "thickness_ratio"
+      min: 0.10 # 최소 10% 두께 (구조 강도)
+      max: 0.20
+
+  aerodynamic:
+    - param: "CL"
+      min: 0.4 # 최소 양력계수
+    - param: "CM"
+      min: -0.10 # 피칭 모멘트 제어
+      max: 0.0 # 부(-) 모멘트 선호 (안정성)
+    - param: "CL/CD"
+      min: 50.0 # 최소 양항비
+
+# 최적화 알고리즘
+optimization:
+  algorithm: "scipy" # scipy.optimize
+  method: "SLSQP" # Sequential Least Squares Programming
+  max_iterations: 50
+  convergence_tol: 1e-4
+
+# Surrogate model
+surrogate:
+  method: "kriging" # Gaussian Process Regression
+  kernel: "matern"
+  training_samples: 100 # NACA는 파라미터 적어서 100개면 충분
+  validation_split: 0.2
+
+# 출력 설정
+output:
+  directory: "output/optimization/cruise_wing"
+  save_history: true
+  plot_convergence: true
+  validate_with_xfoil: true
