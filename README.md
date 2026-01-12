@@ -64,10 +64,28 @@ docker-compose logs jupyter
 ```
 .
 ├── xfoil/                  # XFOIL 소스 코드
+├── scripts/                # Python 자동화 스크립트
+│   ├── generate_naca_airfoil.py
+│   ├── import_airfoil.py
+│   ├── aoa_sweep.py
+│   ├── reynolds_sweep.py
+│   ├── ffd_airfoil.py      # FFD 기반 airfoil 생성
+│   └── test_ffd.py
+├── output/                 # 프로젝트 산출물 (gitignore)
+│   ├── airfoil/            # 생성된 airfoil 형상
+│   │   ├── ffd/            # FFD airfoil 샘플
+│   │   ├── naca/           # NACA airfoil
+│   │   └── custom/         # 커스텀 airfoil
+│   ├── analysis/           # XFOIL 해석 결과
+│   ├── surrogate/          # Surrogate model 학습 결과
+│   └── optimization/       # 최적화 결과
+├── public/airfoil/         # 공유 airfoil 저장소
 ├── environment.yml         # Conda 환경 설정
-├── Dockerfile             # Docker 이미지 정의
-├── docker-compose.yml     # Docker Compose 설정
-└── README.md             # 본 문서
+├── Dockerfile              # Docker 이미지 정의
+├── docker-compose.yml      # Docker Compose 설정
+├── FFD_Tutorial.ipynb      # FFD 학습용 Jupyter 노트북
+├── FFD_QUICKSTART.md       # FFD 빠른 시작 가이드
+└── README.md               # 본 문서
 ```
 
 ## 개발 환경 정보
@@ -96,6 +114,39 @@ python scripts/generate_naca_airfoil.py --batch
 # 생성된 파일 확인
 ls public/airfoil/
 ```
+
+### FFD (Free Form Deformation) Airfoil 생성
+
+Surrogate model 생성을 위한 다양한 airfoil 샘플을 FFD로 생성할 수 있습니다.
+
+```bash
+# 컨테이너 접속
+docker-compose exec xfoil-dev bash
+
+# 단일 FFD airfoil 생성
+python scripts/ffd_airfoil.py --naca 0012 --control-points 5 3 --amplitude 0.02 -o output/airfoil/ffd_0012.dat
+
+# Surrogate model용 다중 샘플 생성 (100개)
+python scripts/ffd_airfoil.py --naca 0012 --samples 100 --control-points 5 3 --amplitude 0.02 --output-dir output/airfoil/ffd_dataset
+
+# 생성된 샘플 확인
+ls output/airfoil/ffd_dataset
+
+# FFD 테스트 스크립트 실행
+python scripts/test_ffd.py
+
+# Jupyter Notebook 튜토리얼
+# http://localhost:8888 에서 FFD_Tutorial.ipynb 열기
+```
+
+**FFD 주요 파라미터:**
+
+- `--control-points NX NY`: 제어점 개수 (기본: 5 3)
+- `--amplitude`: 변형 크기 (chord 비율, 기본: 0.02)
+- `--samples N`: 생성할 랜덤 샘플 개수
+- `--plot`: 변형 결과 시각화 (matplotlib 필요)
+
+자세한 내용은 [scripts/README.md](scripts/README.md) 참조
 
 ### XFOIL 기본 사용
 
