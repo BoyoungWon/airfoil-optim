@@ -1,0 +1,81 @@
+# High-Lift Airfoil Optimization
+# 고양력 익형 최적화 - CL_max 최대화
+
+name: "High-Lift Airfoil Optimization"
+description: |
+  고양력 익형 최적화 - 최대 양력계수 극대화.
+  이착륙 성능 향상, STOL 항공기, 경비행기에 적용.
+  넓은 받음각 범위에서 안정적인 성능 요구.
+
+category: "fixed_wing"
+application: "high_lift"
+
+parametrization:
+  method: "cst" # CST는 캠버 제어 우수
+  baseline: "naca2412"
+  parameters:
+    # CST parameters: upper and lower surface
+    n_upper: 6 # 윗면 6개
+    n_lower: 6 # 아랫면 6개
+    bounds:
+      upper: [-0.3, 0.3] # 각 계수 범위
+      lower: [-0.3, 0.3]
+
+design_points:
+  - name: "takeoff"
+    reynolds: 2.0e6
+    aoa: 12.0 # 이륙 받음각
+    mach: 0.15
+    weight: 0.6
+
+  - name: "landing"
+    reynolds: 1.5e6
+    aoa: 10.0 # 착륙 받음각
+    mach: 0.12
+    weight: 0.4
+
+objectives:
+  - type: "maximize"
+    metric: "CL_max" # 최대 양력계수
+    weight: 0.7
+
+  - type: "minimize"
+    metric: "stall_severity" # 실속 급격성
+    weight: 0.3
+
+constraints:
+  geometry:
+    - param: "thickness_ratio"
+      min: 0.12
+      max: 0.18
+    - param: "leading_edge_radius"
+      min: 0.01 # 앞전 반경 (실속 특성)
+
+  aerodynamic:
+    - param: "CL_max"
+      min: 1.6 # 최소 최대양력계수
+    - param: "alpha_stall"
+      min: 12.0 # 실속 받음각
+    - param: "dCL/dalpha"
+      min: 0.08 # 양력 기울기
+
+optimization:
+  algorithm: "genetic" # 유전 알고리즘 (전역 최적화)
+  population_size: 50
+  max_generations: 100
+  crossover_rate: 0.8
+  mutation_rate: 0.1
+
+surrogate:
+  method: "neural_network"
+  architecture: [128, 64, 32]
+  training_samples: 500
+  validation_split: 0.2
+  epochs: 200
+
+output:
+  directory: "output/optimization/high_lift"
+  save_history: true
+  plot_convergence: true
+  plot_polar: true
+  validate_with_xfoil: true

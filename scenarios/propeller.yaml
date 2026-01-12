@@ -1,0 +1,101 @@
+# Propeller Airfoil Optimization
+# 프로펠러 익형 최적화 - 추진 효율 최대화
+
+name: "Propeller Airfoil Optimization"
+description: |
+  프로펠러 익형 최적화 - 여러 반경 위치에서의 효율 극대화.
+  각 반경 위치마다 다른 운용 조건 (Re, AoA) 고려.
+  추력 생성 효율 및 소음 특성 동시 고려.
+
+category: "rotorcraft"
+application: "propeller"
+
+parametrization:
+  method: "ffd" # FFD로 국소 제어
+  baseline: "naca4412"
+  parameters:
+    control_points:
+      nx: 7 # chord-wise
+      ny: 3 # thickness-wise
+    bounds:
+      deformation: [-0.03, 0.03] # ±3% chord
+
+# 다중 설계점 (프로펠러 여러 반경 위치)
+design_points:
+  - name: "root_70" # 70% 반경
+    reynolds: 3.0e5
+    aoa: 8.0
+    mach: 0.15
+    weight: 0.15
+
+  - name: "station_75" # 75% 반경
+    reynolds: 3.5e5
+    aoa: 6.0
+    mach: 0.18
+    weight: 0.25
+
+  - name: "station_80"
+    reynolds: 4.0e5
+    aoa: 5.0
+    mach: 0.21
+    weight: 0.25
+
+  - name: "station_85"
+    reynolds: 4.5e5
+    aoa: 4.0
+    mach: 0.24
+    weight: 0.20
+
+  - name: "tip_90" # 90% 반경 (팁)
+    reynolds: 5.0e5
+    aoa: 3.0
+    mach: 0.28
+    weight: 0.15
+
+objectives:
+  - type: "maximize"
+    metric: "propulsive_efficiency" # 통합 추진 효율
+    weight: 0.8
+
+  - type: "minimize"
+    metric: "noise_metric" # 소음 지표
+    weight: 0.2
+
+constraints:
+  geometry:
+    - param: "thickness_ratio"
+      min: 0.09
+      max: 0.15
+    - param: "smoothness"
+      min: 0.9 # 곡률 연속성
+
+  aerodynamic:
+    - param: "CL/CD"
+      min: 40.0 # 각 스테이션 최소 L/D
+    - param: "CD"
+      max: 0.02
+
+optimization:
+  algorithm: "genetic"
+  population_size: 60
+  max_generations: 150
+  crossover_rate: 0.7
+  mutation_rate: 0.15
+  elitism: 0.1
+
+surrogate:
+  method: "neural_network"
+  architecture: [256, 128, 64, 32]
+  activation: "relu"
+  training_samples: 2000
+  validation_split: 0.2
+  epochs: 300
+  batch_size: 32
+
+output:
+  directory: "output/optimization/propeller"
+  save_history: true
+  plot_convergence: true
+  plot_radial_distribution: true
+  validate_with_xfoil: true
+  save_bemt_input: true # Blade Element Momentum Theory

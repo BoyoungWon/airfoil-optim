@@ -1,0 +1,104 @@
+# Wind Turbine Airfoil Optimization
+# 풍력터빈 익형 최적화 - 에너지 추출 최대화
+
+name: "Wind Turbine Airfoil Optimization"
+description: |
+  풍력터빈 블레이드 익형 최적화.
+  넓은 풍속 범위에서 연간 에너지 생산량(AEP) 최대화.
+  구조 하중, 소음, 제조 비용 동시 고려.
+
+category: "rotorcraft"
+application: "wind_turbine"
+
+parametrization:
+  method: "cst"
+  baseline: "du91w2250" # DU series (풍력터빈용)
+  parameters:
+    n_upper: 8
+    n_lower: 8
+    bounds:
+      upper: [-0.25, 0.25]
+      lower: [-0.25, 0.25]
+
+# 다양한 풍속 조건
+design_points:
+  - name: "wind_6ms"
+    reynolds: 3.0e6
+    aoa: 8.0
+    mach: 0.018
+    weight: 0.15
+
+  - name: "wind_8ms" # 평균 풍속
+    reynolds: 4.0e6
+    aoa: 6.0
+    mach: 0.024
+    weight: 0.30
+
+  - name: "wind_10ms"
+    reynolds: 5.0e6
+    aoa: 5.0
+    mach: 0.030
+    weight: 0.25
+
+  - name: "wind_12ms"
+    reynolds: 6.0e6
+    aoa: 4.0
+    mach: 0.035
+    weight: 0.20
+
+  - name: "wind_15ms" # 고풍속
+    reynolds: 7.5e6
+    aoa: 3.0
+    mach: 0.044
+    weight: 0.10
+
+objectives:
+  - type: "maximize"
+    metric: "power_coefficient" # Cp 최대화
+    weight: 0.5
+
+  - type: "maximize"
+    metric: "AEP" # Annual Energy Production
+    weight: 0.4
+
+  - type: "minimize"
+    metric: "noise"
+    weight: 0.1
+
+constraints:
+  geometry:
+    - param: "thickness_ratio"
+      min: 0.18 # 구조 강도 (블레이드 크기)
+      max: 0.30
+    - param: "trailing_edge_thickness"
+      max: 0.01 # 소음 저감
+
+  aerodynamic:
+    - param: "CL_max"
+      min: 1.4
+    - param: "CL/CD"
+      min: 80.0 # 고효율
+    - param: "roughness_sensitivity"
+      max: 0.15 # 표면 거칠기 민감도
+
+optimization:
+  algorithm: "genetic"
+  population_size: 80
+  max_generations: 200
+  crossover_rate: 0.75
+  mutation_rate: 0.12
+
+surrogate:
+  method: "neural_network"
+  architecture: [256, 128, 64]
+  training_samples: 1500
+  validation_split: 0.2
+  epochs: 250
+
+output:
+  directory: "output/optimization/wind_turbine"
+  save_history: true
+  plot_convergence: true
+  plot_power_curve: true
+  plot_aep_distribution: true
+  validate_with_xfoil: true

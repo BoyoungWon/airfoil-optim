@@ -14,3 +14,11 @@ dependencies:
   - openmpi
   - openblas
   - lapack
+  # Cruise Wing 최적화 모듈
+  - scikit-learn # Kriging/GPR surrogate model
+  - matplotlib # 시각화
+  - pyyaml # YAML 설정 파일 파싱
+  - joblib # 모델 직렬화
+  # 최적화 알고리즘
+  - pymoo # NSGA-II, NSGA-III 등 다목적 최적화
+  # OpenFOAM interface (PyFoam 등은 pip로 설치)

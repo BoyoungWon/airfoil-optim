@@ -1,0 +1,100 @@
+# Control Surface Optimization
+# 제어면 익형 최적화 - 제어 효율 극대화
+
+name: "Control Surface Optimization"
+description: |
+  방향타/승강타 익형 최적화.
+  제어 효율 극대화 및 힌지 모멘트 최소화.
+  넓은 편향각 범위에서 선형적 특성 유지.
+
+category: "control_surface"
+application: "rudder_elevator"
+
+parametrization:
+  method: "naca" # 대칭 익형 선호
+  baseline: "naca0012"
+  parameters:
+    bounds:
+      max_camber: [0.0, 2.0] # 거의 대칭
+      camber_pos: [4, 5]
+      thickness: [10, 18]
+
+# 여러 편향각 조건
+design_points:
+  - name: "neutral" # 중립
+    reynolds: 2.0e6
+    aoa: 0.0
+    deflection: 0.0
+    weight: 0.20
+
+  - name: "deflect_10"
+    reynolds: 2.0e6
+    aoa: 0.0
+    deflection: 10.0
+    weight: 0.20
+
+  - name: "deflect_20"
+    reynolds: 2.0e6
+    aoa: 0.0
+    deflection: 20.0
+    weight: 0.30
+
+  - name: "deflect_minus_10"
+    reynolds: 2.0e6
+    aoa: 0.0
+    deflection: -10.0
+    weight: 0.15
+
+  - name: "deflect_minus_20"
+    reynolds: 2.0e6
+    aoa: 0.0
+    deflection: -20.0
+    weight: 0.15
+
+objectives:
+  - type: "maximize"
+    metric: "control_effectiveness" # dCL/d(delta)
+    weight: 0.6
+
+  - type: "minimize"
+    metric: "hinge_moment" # 힌지 모멘트
+    weight: 0.3
+
+  - type: "maximize"
+    metric: "linearity" # 선형성
+    weight: 0.1
+
+constraints:
+  geometry:
+    - param: "thickness_ratio"
+      min: 0.10
+      max: 0.16
+    - param: "symmetry"
+      min: 0.95 # 거의 대칭
+
+  aerodynamic:
+    - param: "CM"
+      min: -0.05
+      max: 0.05
+    - param: "dCL/ddelta"
+      min: 0.015 # 최소 제어 효율
+
+optimization:
+  algorithm: "scipy"
+  method: "SLSQP"
+  max_iterations: 60
+  convergence_tol: 1e-5
+
+surrogate:
+  method: "kriging"
+  kernel: "rbf"
+  training_samples: 150
+  validation_split: 0.2
+
+output:
+  directory: "output/optimization/control_surface"
+  save_history: true
+  plot_convergence: true
+  plot_control_effectiveness: true
+  plot_hinge_moment: true
+  validate_with_xfoil: true

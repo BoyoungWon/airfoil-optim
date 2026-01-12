@@ -22,7 +22,13 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     vim \
+    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
+
+# Add OpenFOAM repository (for future use)
+# OpenFOAM will be installed when needed for Propeller/Wind Turbine scenarios
+RUN add-apt-repository -y ppa:openfoam/stable || true && \
+    apt-get update || true
 
 # Install Miniforge (conda-forge only, no TOS issues)
 RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh && \
