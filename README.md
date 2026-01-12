@@ -62,12 +62,23 @@ docker-compose down
 │   ├── ffd_airfoil.py             # FFD airfoil 생성
 │   ├── optimize_airfoil.py        # 메인 최적화 스크립트
 │   ├── validate_scenario.py       # 시나리오 검증
-│   └── optimize/                  # 최적화 모듈
+│   ├── run_cruise_wing.py         # Cruise Wing CLI
+│   ├── test_cruise_wing.py        # Cruise Wing 테스트
+│   ├── cruise_wing/               # Cruise Wing 전용 모듈
+│   │   ├── __init__.py            # 패키지 초기화
+│   │   ├── database.py            # NACA 데이터베이스
+│   │   ├── analyzer.py            # XFOIL 해석 인터페이스
+│   │   ├── kriging.py             # Kriging surrogate 모델
+│   │   ├── optimizer.py           # SLSQP 최적화
+│   │   ├── visualizer.py          # 결과 시각화
+│   │   ├── workflow.py            # 4-phase 워크플로우
+│   │   └── README.md              # 모듈 설명서
+│   └── optimize/                  # 최적화 모듈 (범용)
 │       ├── parametrization.py     # 형상 매개변수화 (NACA/CST/FFD)
 │       ├── surrogate.py           # Surrogate 모델
 │       └── xfoil_interface.py     # XFOIL 인터페이스
 ├── scenarios/               # 최적화 시나리오 (YAML)
-│   ├── cruise_wing.yaml           # 순항 익형 최적화
+│   ├── cruise_wing.yaml           # 순항 익형 최적화 ✓ 구현완료
 │   ├── high_lift.yaml             # 고양력 익형 최적화
 │   ├── low_speed.yaml             # 저속 UAV 익형
 │   ├── propeller.yaml             # 프로펠러 익형
@@ -110,8 +121,23 @@ python scripts/validate_scenario.py --scenario scenarios/cruise_wing.yaml
 
 ### 2. 최적화 실행
 
+#### Cruise Wing (전용 모듈 구현완료)
+
 ```bash
-# 순항 익형 최적화 (NACA + Kriging)
+# Cruise Wing 최적화 실행 (NACA + XFOIL + Kriging + SLSQP)
+python scripts/run_cruise_wing.py --scenario scenarios/cruise_wing.yaml
+
+# 테스트 실행
+python scripts/test_cruise_wing.py
+
+# 직접 최적화 (surrogate 없이 XFOIL 직접 호출)
+python scripts/run_cruise_wing.py --direct --reynolds 1000000 --aoa 5.0 --mach 0.2
+```
+
+#### 범용 최적화 (다른 시나리오)
+
+```bash
+# 순항 익형 최적화 (NACA + Kriging) - 범용 모듈
 python scripts/optimize_airfoil.py --scenario scenarios/cruise_wing.yaml
 
 # 고양력 익형 최적화 (CST + Neural Network)
@@ -133,6 +159,98 @@ cat output/optimization/cruise_wing/optimal_airfoil.dat
 # 최적화 히스토리
 cat output/optimization/cruise_wing/optimization_history.json
 ```
+
+## Cruise Wing 최적화 (구현완료)
+
+### 개요
+
+**Application**: 일반 항공기, 글라이더, 소형 무인기  
+**Operating Condition**:
+
+- Reynolds: 50,000 - 50,000,000 (XFOIL valid range)
+- Mach: 0 - 0.5 (with compressibility correction)
+- AoA: -5° - 15° (pre-stall region)
+
+**Design Objective**: Maximize L/D at cruise  
+**Complexity**: ★☆☆☆☆ (가장 단순, 3 parameters)  
+**Timeline**: 1-2일
+
+### 기술 스택
+
+| Component           | Method               | Rationale                                      |
+| ------------------- | -------------------- | ---------------------------------------------- |
+| **Parametrization** | NACA 4-digit         | 3 variables → 빠른 최적화, 물리적 타당성       |
+| **Solver**          | XFOIL                | Re 50k-50M, Ma≤0.5에서 신뢰성, <1초/evaluation |
+| **Surrogate**       | Kriging (Matérn 5/2) | 적은 samples로 좋은 정확도, uncertainty 제공   |
+| **Optimizer**       | SLSQP                | Smooth objective, 빠른 수렴, constraint 처리   |
+
+### 워크플로우 (4 Phase)
+
+```
+Phase 1: Database Screening (30분)
+├─ XFOIL로 NACA library 스캔
+└─ Similar Re, Cl에서 top 5 선정
+
+Phase 2: Surrogate Training (1-2시간)
+├─ Latin Hypercube Sampling (80-100 samples)
+├─ Kriging model 구축
+└─ Cross-validation 검증
+
+Phase 3: NACA Optimization (1-2시간)
+├─ SLSQP with surrogate
+├─ Multi-start optimization (5 starts)
+└─ Optimal NACA parameters 도출
+
+Phase 4: Validation (30분)
+├─ XFOIL polar 분석
+└─ 최종 성능 확인
+```
+
+### 사용 방법
+
+```bash
+# 기본 실행
+python scripts/run_cruise_wing.py --scenario scenarios/cruise_wing.yaml
+
+# 상세 로그 출력
+python scripts/run_cruise_wing.py --scenario scenarios/cruise_wing.yaml --verbose
+
+# 직접 최적화 (surrogate 없이)
+python scripts/run_cruise_wing.py --direct --reynolds 1000000 --aoa 5.0 --mach 0.2
+
+# 커스텀 파라미터
+python scripts/run_cruise_wing.py --scenario scenarios/cruise_wing.yaml \
+  --reynolds 2000000 --aoa 6.0 --mach 0.25
+```
+
+### 결과 확인
+
+```bash
+# 최적화 결과 디렉토리
+ls output/optimization/cruise_wing_[timestamp]/
+
+# 주요 파일
+├── optimal_airfoil.dat        # 최적 익형 좌표
+├── optimization_history.json   # 최적화 이력
+├── surrogate_model.pkl         # 학습된 surrogate 모델
+├── validation_results.json     # 검증 결과
+└── plots/                      # 시각화 결과
+    ├── convergence.png         # 수렴 곡선
+    ├── airfoil_comparison.png  # 익형 비교
+    ├── polar_comparison.png    # 극선 비교
+    └── design_space.png        # 설계 공간
+```
+
+### 모듈 구조
+
+- `database.py`: NACA 데이터베이스 관리 및 초기 스크리닝
+- `analyzer.py`: XFOIL 인터페이스 (단일/극선/다중점 해석)
+- `kriging.py`: Kriging surrogate 모델 (GPR with Matérn 5/2 kernel)
+- `optimizer.py`: SLSQP 최적화 (surrogate/direct 모드)
+- `visualizer.py`: 결과 시각화 (6가지 플롯 타입)
+- `workflow.py`: 4-phase 워크플로우 오케스트레이터
+
+자세한 내용은 [scripts/cruise_wing/README.md](scripts/cruise_wing/README.md)를 참조하세요.
 
 ## 사용 예제
 
@@ -243,23 +361,35 @@ python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
 
 ## 최적화 시나리오
 
-| 시나리오               | 카테고리 | 매개변수화 | Surrogate  | 목적          |
-| ---------------------- | -------- | ---------- | ---------- | ------------- |
-| `cruise_wing.yaml`     | 고정익   | NACA       | Kriging    | max L/D       |
-| `high_lift.yaml`       | 고정익   | CST        | Neural Net | max CL_max    |
-| `low_speed.yaml`       | 고정익   | CST        | Kriging    | max CL^1.5/CD |
-| `propeller.yaml`       | 회전익   | FFD        | Neural Net | multi-point   |
-| `wind_turbine.yaml`    | 회전익   | CST        | Neural Net | max AEP       |
-| `control_surface.yaml` | 조종면   | NACA       | Kriging    | effectiveness |
+| 시나리오               | 카테고리 | 매개변수화 | Surrogate  | 목적          | 상태       |
+| ---------------------- | -------- | ---------- | ---------- | ------------- | ---------- |
+| `cruise_wing.yaml`     | 고정익   | NACA       | Kriging    | max L/D       | ✓ 구현완료 |
+| `high_lift.yaml`       | 고정익   | CST        | Neural Net | max CL_max    | 계획중     |
+| `low_speed.yaml`       | 고정익   | CST        | Kriging    | max CL^1.5/CD | 계획중     |
+| `propeller.yaml`       | 회전익   | FFD        | Neural Net | multi-point   | 계획중     |
+| `wind_turbine.yaml`    | 회전익   | CST        | Neural Net | max AEP       | 계획중     |
+| `control_surface.yaml` | 조종면   | NACA       | Kriging    | effectiveness | 계획중     |
 
 ## 필요 패키지
 
+### Cruise Wing 모듈 (구현완료)
+
+```bash
+# 필수 패키지 (environment.yml에 포함)
+- scikit-learn (Kriging/GPR)
+- matplotlib (시각화)
+- pyyaml (설정 파일)
+- joblib (모델 저장)
+```
+
+### 다른 시나리오용 추가 패키지
+
 ```bash
 # 컨테이너 내부에서 설치
-pip install scikit-learn scikit-optimize torch pyyaml
+pip install torch scikit-optimize
 
 # 또는 conda 환경에 추가
-conda install -c conda-forge scikit-learn scikit-optimize pytorch pyyaml
+conda install -c conda-forge pytorch scikit-optimize
 ```
 
 ## 문제 해결

@@ -7,9 +7,12 @@ services:
     container_name: airfoil-optim-dev
     volumes:
       - .:/workspace
+      - ./output:/workspace/output # 최적화 결과 저장
     environment:
       - OMPI_ALLOW_RUN_AS_ROOT=1
       - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+      - PYTHONPATH=/workspace/scripts # Python 모듈 경로
+      - XFOIL_PATH=/usr/local/bin/xfoil # XFOIL 실행파일 경로
     stdin_open: true
     tty: true
     working_dir: /workspace
