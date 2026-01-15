@@ -1,15 +1,51 @@
 # Airfoil Optimization Framework
 
-Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL 및 OpenFOAM을 사용한 공력 해석과 다양한 형상 매개변수화 방법(NACA, CST, FFD)을 지원하며, Kriging, Neural Network 등의 surrogate model을 활용한 효율적인 최적화를 제공합니다.
+Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL 및 SU2 RANS를 사용한 공력 해석과 다양한 형상 매개변수화 방법(NACA, CST, FFD)을 지원하며, Kriging, Neural Network 등의 surrogate model을 활용한 효율적인 최적화를 제공합니다.
 
-## 주요 기능
+## 🎯 주요 기능
 
 - **다중 형상 매개변수화**: NACA (3 params), CST (8-30 params), FFD (15-100+ params)
-- **CFD 솔버**: XFOIL (2D panel method), OpenFOAM (3D RANS/LES)
+- **다중 CFD 솔버**:
+  - **XFoil** (2D panel method) - Re 1e4~1e6, Mach < 0.5
+  - **SU2 RANS** (SA/SST/Gamma-Re-theta) - Re > 1e6 or Mach ≥ 0.5
+  - **자동 Solver 선택** - 조건에 따라 최적 solver 자동 선택
 - **Surrogate 모델**: Kriging/GPR, Neural Network, Polynomial RSM
 - **최적화 알고리즘**: SLSQP, NSGA-II, Bayesian Optimization
 - **다중 설계점 최적화**: 가중 평균 기반 multi-point optimization
 - **시나리오 기반 실행**: YAML 설정 파일로 간편한 최적화 실행
+
+## 🚀 빠른 시작
+
+### 1. Solver 가용성 확인
+
+```bash
+python examples/demo_solver_selection.py
+```
+
+### 2. 단일 해석 실행
+
+```bash
+# Low Re (XFoil 자동 선택)
+python scripts/unified_analysis.py input/airfoil/naca0012.dat \
+    --re 5e5 --mach 0.2 --aoa 5.0
+
+# High Re, transonic (SU2 SST 자동 선택)
+python scripts/unified_analysis.py input/airfoil/naca0012.dat \
+    --re 3e6 --mach 0.75 --aoa 2.5
+```
+
+### 3. AoA Sweep
+
+```bash
+python scripts/unified_analysis.py input/airfoil/naca0012.dat \
+    --re 1e6 --mach 0.3 --aoa-sweep -5 15 0.5
+```
+
+## 📚 문서
+
+- **[ANALYSIS_GUIDE.md](ANALYSIS_GUIDE.md)** - XFoil 기본 사용법
+- **[MULTI_SOLVER_GUIDE.md](MULTI_SOLVER_GUIDE.md)** - 다중 solver 자동 선택 시스템 ⭐ NEW
+- **[examples/](examples/)** - 다양한 비행 조건 예시
 
 ## 환경 구성
 

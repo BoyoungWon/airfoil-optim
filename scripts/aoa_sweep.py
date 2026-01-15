@@ -100,12 +100,16 @@ def aoa_sweep(airfoil_file, reynolds, aoa_min, aoa_max, d_aoa,
     
     # Check if airfoil file exists
     if not airfoil_path.exists():
-        # Try looking in public/airfoil directory
-        alt_path = Path("public/airfoil") / airfoil_path.name
+        # Try looking in input/airfoil directory first
+        alt_path = Path("input/airfoil") / airfoil_path.name
         if alt_path.exists():
             airfoil_path = alt_path
+        # Then try public/airfoil directory
+        elif (Path("public/airfoil") / airfoil_path.name).exists():
+            airfoil_path = Path("public/airfoil") / airfoil_path.name
         else:
             print(f"✗ Error: Airfoil file not found: {airfoil_file}")
+            print(f"  Searched in: {airfoil_file}, input/airfoil/, public/airfoil/")
             return None, None
     
     # Create output directory
