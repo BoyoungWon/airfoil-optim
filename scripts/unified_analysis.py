@@ -48,8 +48,6 @@ def run_unified_single_point(airfoil_file: str,
                             aoa: float,
                             solver: Optional[SolverType] = None,
                             output_dir: str = "output/analysis/unified",
-                            use_neuralfoil_fallback: bool = True,
-                            ncrit: Optional[float] = None,
                             **kwargs) -> Tuple[bool, Optional[Dict]]:
     """
     단일 조건 해석 (자동 solver 선택)
@@ -68,8 +66,6 @@ def run_unified_single_point(airfoil_file: str,
         User-specified solver (None for auto-selection)
     output_dir : str
         Output directory
-    use_neuralfoil_fallback : bool
-        Use NeuralFoil as fallback if XFoil fails (default: True)
         
     Returns:
     --------
@@ -83,10 +79,6 @@ def run_unified_single_point(airfoil_file: str,
     selected_solver = SolverSelector.select_solver(condition, solver)
     settings = SolverSelector.get_recommended_settings(condition, selected_solver)
     
-    # Override ncrit if specified
-    if ncrit is not None:
-        settings['ncrit'] = ncrit
-    
     # Print selection info
     SolverSelector.print_selection_info(condition, selected_solver, settings)
     
@@ -96,30 +88,7 @@ def run_unified_single_point(airfoil_file: str,
     
     # Execute based on solver type
     if selected_solver == SolverType.XFOIL:
-        success, result = _run_xfoil_single(airfoil_path, reynolds, aoa, settings, output_path)
-        
-        # Fallback to NeuralFoil if XFoil fails
-        if not success and use_neuralfoil_fallback and mach < 0.5:
-            print("\n" + "="*70)
-            print("⚠ XFOIL FAILED - TRYING NEURALFOIL FALLBACK")
-            print("="*70)
-            print("XFoil did not converge. Attempting NeuralFoil as fallback...")
-            
-            # Check if NeuralFoil is available
-            avail = get_solver_availability()
-            if avail.get('neuralfoil', False):
-                nf_settings = SolverSelector.get_recommended_settings(condition, SolverType.NEURALFOIL)
-                success, result = _run_neuralfoil_single(airfoil_path, reynolds, aoa, nf_settings, output_path)
-                if success:
-                    print("\n✓ NeuralFoil fallback successful!")
-            else:
-                print("\n✗ NeuralFoil not available for fallback")
-                print("  Install: cd neuralfoil && pip install -e .")
-        
-        return success, result
-    
-    elif selected_solver == SolverType.NEURALFOIL:
-        return _run_neuralfoil_single(airfoil_path, reynolds, aoa, settings, output_path)
+        return _run_xfoil_single(airfoil_path, reynolds, aoa, settings, output_path)
     
     elif selected_solver in [SolverType.SU2_SA, SolverType.SU2_SST, 
                             SolverType.SU2_GAMMA_RETHETA]:
@@ -175,102 +144,6 @@ def _run_xfoil_single(airfoil_path: Path, reynolds: float, aoa: float,
             print(f"\n✗ Analysis failed to converge")
             return False, None
             
-    except Exception as e:
-        print(f"\n✗ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False, None
-
-
-def _run_neuralfoil_single(airfoil_path: Path, reynolds: float, aoa: float,
-                          settings: dict, output_path: Path) -> Tuple[bool, Optional[Dict]]:
-    """NeuralFoil single point analysis"""
-    
-    print("\n" + "="*70)
-    print("RUNNING NEURALFOIL ANALYSIS")
-    print("="*70)
-    
-    try:
-        # Import NeuralFoil
-        import sys
-        neuralfoil_path = Path(__file__).parent.parent / "neuralfoil"
-        if str(neuralfoil_path) not in sys.path:
-            sys.path.insert(0, str(neuralfoil_path))
-        
-        from neuralfoil import get_aero_from_dat_file
-        
-        # Run NeuralFoil
-        print(f"\nAnalyzing with neural network surrogate...")
-        print(f"  Model size: {settings.get('model_size', 'xlarge')}")
-        
-        result = get_aero_from_dat_file(
-            str(airfoil_path),
-            alpha=aoa,
-            Re=reynolds,
-            n_crit=settings.get('ncrit', 9),
-            xtr_upper=settings.get('xtr_upper', 1.0),
-            xtr_lower=settings.get('xtr_lower', 1.0),
-            model_size=settings.get('model_size', 'xlarge')
-        )
-        
-        # Extract scalar values
-        CL = float(result['CL'][0]) if hasattr(result['CL'], '__len__') else float(result['CL'])
-        CD = float(result['CD'][0]) if hasattr(result['CD'], '__len__') else float(result['CD'])
-        CM = float(result['CM'][0]) if hasattr(result['CM'], '__len__') else float(result['CM'])
-        confidence = float(result['analysis_confidence'][0]) if hasattr(result['analysis_confidence'], '__len__') else float(result['analysis_confidence'])
-        Top_Xtr = float(result['Top_Xtr'][0]) if hasattr(result['Top_Xtr'], '__len__') else float(result['Top_Xtr'])
-        Bot_Xtr = float(result['Bot_Xtr'][0]) if hasattr(result['Bot_Xtr'], '__len__') else float(result['Bot_Xtr'])
-        
-        print(f"\n✓ Analysis complete")
-        print(f"  CL = {CL:.6f}")
-        print(f"  CD = {CD:.6f}")
-        print(f"  CM = {CM:.6f}")
-        print(f"  L/D = {CL/CD:.2f}")
-        print(f"  Analysis confidence = {confidence:.3f}")
-        print(f"  Top transition: {Top_Xtr:.3f}")
-        print(f"  Bot transition: {Bot_Xtr:.3f}")
-        
-        if confidence < 0.5:
-            print(f"  ⚠ Warning: Low confidence ({confidence:.3f})")
-            print(f"    Results may be less accurate outside training data distribution")
-        
-        # Prepare result dictionary
-        result_dict = {
-            'reynolds': reynolds,
-            'aoa': aoa,
-            'mach': 0.0,  # NeuralFoil is incompressible
-            'CL': CL,
-            'CD': CD,
-            'CM': CM,
-            'Top_Xtr': Top_Xtr,
-            'Bot_Xtr': Bot_Xtr,
-            'analysis_confidence': confidence,
-            'converged': True,
-            'solver': 'neuralfoil'
-        }
-        
-        # Save result
-        result_file = output_path / f"{airfoil_path.stem}_Re{reynolds:.0e}_M0.00_aoa{aoa:.1f}_neuralfoil.csv"
-        if HAS_PANDAS:
-            df = pd.DataFrame([result_dict])
-            df.to_csv(result_file, index=False)
-            print(f"\n✓ Results saved: {result_file}")
-        else:
-            # Save as simple CSV without pandas
-            import csv
-            with open(result_file, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=result_dict.keys())
-                writer.writeheader()
-                writer.writerow(result_dict)
-            print(f"\n✓ Results saved: {result_file}")
-        
-        return True, result_dict
-        
-    except ImportError as e:
-        print(f"\n✗ NeuralFoil not available: {e}")
-        print("  Install NeuralFoil: pip install neuralfoil")
-        print("  Or install from local: cd neuralfoil && pip install -e .")
-        return False, None
     except Exception as e:
         print(f"\n✗ Error: {e}")
         import traceback
@@ -364,7 +237,6 @@ def run_unified_aoa_sweep(airfoil_file: str,
                          d_aoa: float,
                          solver: Optional[SolverType] = None,
                          output_dir: str = "output/analysis/unified",
-                         ncrit: Optional[float] = None,
                          **kwargs) -> Tuple[bool, Optional[object]]:
     """
     AoA sweep (자동 solver 선택)
@@ -376,10 +248,6 @@ def run_unified_aoa_sweep(airfoil_file: str,
     # Select solver
     selected_solver = SolverSelector.select_solver(condition, solver)
     settings = SolverSelector.get_recommended_settings(condition, selected_solver)
-    
-    # Override ncrit if specified
-    if ncrit is not None:
-        settings['ncrit'] = ncrit
     
     # Print selection info
     SolverSelector.print_selection_info(condition, selected_solver, settings)
@@ -431,100 +299,6 @@ def run_unified_aoa_sweep(airfoil_file: str,
         
         return True, None
     
-    elif selected_solver == SolverType.NEURALFOIL:
-        print(f"\n{'='*70}")
-        print("RUNNING NEURALFOIL AOA SWEEP")
-        print(f"{'='*70}")
-        
-        # Build AoA array
-        import numpy as np
-        aoa_values = np.arange(aoa_min, aoa_max + d_aoa/2, d_aoa)
-        
-        print(f"\n  Total AoA points: {len(aoa_values)}")
-        print(f"  Range: {aoa_min}° to {aoa_max}° (Δα = {d_aoa}°)")
-        
-        try:
-            # Import NeuralFoil
-            import sys
-            neuralfoil_path = Path(__file__).parent.parent / "neuralfoil"
-            if str(neuralfoil_path) not in sys.path:
-                sys.path.insert(0, str(neuralfoil_path))
-            
-            from neuralfoil import get_aero_from_dat_file
-            
-            # Run vectorized NeuralFoil analysis
-            print(f"\nAnalyzing with neural network surrogate (vectorized)...")
-            print(f"  Model size: {settings.get('model_size', 'xlarge')}")
-            
-            result = get_aero_from_dat_file(
-                str(airfoil_path),
-                alpha=aoa_values,
-                Re=reynolds,
-                n_crit=settings.get('ncrit', 9),
-                xtr_upper=settings.get('xtr_upper', 1.0),
-                xtr_lower=settings.get('xtr_lower', 1.0),
-                model_size=settings.get('model_size', 'xlarge')
-            )
-            
-            # Convert to DataFrame
-            results_list = []
-            for i, aoa in enumerate(aoa_values):
-                results_list.append({
-                    'reynolds': reynolds,
-                    'mach': mach,
-                    'aoa': float(aoa),
-                    'CL': float(result['CL'][i]),
-                    'CD': float(result['CD'][i]),
-                    'CM': float(result['CM'][i]),
-                    'Top_Xtr': float(result['Top_Xtr'][i]),
-                    'Bot_Xtr': float(result['Bot_Xtr'][i]),
-                    'analysis_confidence': float(result['analysis_confidence'][i]),
-                    'converged': True,
-                    'solver': 'neuralfoil'
-                })
-            
-            if HAS_PANDAS:
-                df = pd.DataFrame(results_list)
-                
-                # Save results
-                output_path = Path(output_dir)
-                output_path.mkdir(parents=True, exist_ok=True)
-                
-                result_file = output_path / f"{airfoil_path.stem}_Re{reynolds:.0e}_M{mach:.3f}_aoa{aoa_min}to{aoa_max}_neuralfoil.csv"
-                df.to_csv(result_file, index=False)
-                
-                print(f"\n✓ Analysis complete")
-                print(f"  Results saved: {result_file}")
-                
-                # Print summary statistics
-                print(f"\n  Summary:")
-                print(f"    CL range:  {df['CL'].min():.4f} to {df['CL'].max():.4f}")
-                print(f"    CD range:  {df['CD'].min():.6f} to {df['CD'].max():.6f}")
-                print(f"    Max L/D:   {(df['CL']/df['CD']).max():.2f} at α={df.loc[(df['CL']/df['CD']).idxmax(), 'aoa']:.1f}°")
-                
-                # Check for low confidence points
-                low_conf = df[df['analysis_confidence'] < 0.5]
-                if len(low_conf) > 0:
-                    print(f"\n  ⚠ Warning: {len(low_conf)} points with low confidence (<0.5)")
-                    print(f"    AoA: {low_conf['aoa'].min():.1f}° to {low_conf['aoa'].max():.1f}°")
-                
-                return True, df
-            else:
-                print(f"\n✓ Analysis complete")
-                print("  (Install pandas for CSV output: pip install pandas)")
-                return True, results_list
-                
-        except ImportError as e:
-            print(f"\n✗ NeuralFoil not available: {e}")
-            print("  Install NeuralFoil: pip install neuralfoil")
-            print("  Or install from local: cd neuralfoil && pip install -e .")
-            return False, None
-        except Exception as e:
-            print(f"\n✗ Error: {e}")
-            import traceback
-            traceback.print_exc()
-            return False, None
-    
     else:
         print(f"✗ Unsupported solver for AoA sweep: {selected_solver}")
         return False, None
@@ -552,29 +326,23 @@ Examples:
         """
     )
     
-    parser.add_argument('airfoil_file', type=str, nargs='?',
+    parser.add_argument('airfoil_file', type=str,
                        help='Path to airfoil coordinate file (.dat)')
-    parser.add_argument('--re', type=float,
+    parser.add_argument('--re', type=float, required=True,
                        help='Reynolds number')
     parser.add_argument('--mach', type=float, default=0.0,
                        help='Mach number (default: 0.0)')
     
     # Single point or sweep
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--aoa', type=float,
                       help='Single angle of attack (degrees)')
     group.add_argument('--aoa-sweep', nargs=3, type=float, metavar=('MIN', 'MAX', 'STEP'),
                       help='AoA sweep: min max step (degrees)')
     
     # Solver selection
-    parser.add_argument('--solver', type=str, choices=['xfoil', 'neuralfoil', 'su2_sa', 'su2_sst', 'su2_gamma_retheta'],
+    parser.add_argument('--solver', type=str, choices=['xfoil', 'su2_sa', 'su2_sst', 'su2_gamma_retheta'],
                        help='Force specific solver (default: auto-select)')
-    parser.add_argument('--no-fallback', action='store_true',
-                       help='Disable NeuralFoil fallback when XFoil fails')
-    
-    # Solver settings
-    parser.add_argument('--ncrit', type=float, default=None,
-                       help='Ncrit value for XFoil/NeuralFoil (default: auto based on Re)')
     
     # Output
     parser.add_argument('--output-dir', type=str, default='output/analysis/unified',
@@ -602,14 +370,6 @@ Examples:
             sys.exit(1)
         
         sys.exit(0)
-    
-    # Validate required arguments
-    if not args.airfoil_file:
-        parser.error("airfoil_file is required unless --check is specified")
-    if not args.re:
-        parser.error("--re is required unless --check is specified")
-    if args.aoa is None and args.aoa_sweep is None:
-        parser.error("either --aoa or --aoa-sweep is required")
     
     # Parse solver type
     solver_type = None
@@ -646,9 +406,7 @@ Examples:
             args.mach,
             args.aoa,
             solver=solver_type,
-            output_dir=args.output_dir,
-            use_neuralfoil_fallback=(not args.no_fallback),
-            ncrit=args.ncrit
+            output_dir=args.output_dir
         )
         
         if success:
@@ -674,8 +432,7 @@ Examples:
             aoa_max,
             d_aoa,
             solver=solver_type,
-            output_dir=args.output_dir,
-            ncrit=args.ncrit
+            output_dir=args.output_dir
         )
         
         if success:

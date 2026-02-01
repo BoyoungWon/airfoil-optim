@@ -17,7 +17,6 @@ from typing import Optional
 class SolverType(Enum):
     """CFD Solver 종류"""
     XFOIL = "xfoil"
-    NEURALFOIL = "neuralfoil"  # Neural network surrogate (fast, good for difficult convergence)
     SU2_SA = "su2_sa"           # Spalart-Allmaras
     SU2_SST = "su2_sst"         # k-omega SST
     SU2_GAMMA_RETHETA = "su2_gamma_retheta"  # Gamma-Re-theta transition
@@ -46,12 +45,10 @@ class SolverSelector:
     ----------------
     1. Low Reynolds (Re < 1e5):
        - XFoil with lower Ncrit (5-7.5) for laminar-turbulent transition
-       - NeuralFoil as fallback if XFoil fails to converge
        
     2. Medium Reynolds (1e5 <= Re < 1e6):
        - XFoil (optimal range)
        - Ncrit = 7.5-9 for standard conditions
-       - NeuralFoil as fallback for transition regions
        
     3. High Reynolds (Re >= 1e6):
        - SU2 RANS solvers recommended
@@ -63,12 +60,6 @@ class SolverSelector:
        
     5. Transonic flow (Mach >= 0.7):
        - SU2 with proper shock capturing
-       
-    6. NeuralFoil:
-       - Fast neural network surrogate
-       - Good for low-medium Re (Re < 1e7), incompressible (Mach < 0.5)
-       - Useful as fallback when XFoil fails to converge
-       - Trained on Re range: 1e4 - 1e7
     """
     
     # Threshold values
@@ -168,14 +159,6 @@ class SolverSelector:
                 return False  # XFoil may struggle at very high Re
             return True
         
-        elif solver == SolverType.NEURALFOIL:
-            # NeuralFoil limitations
-            if mach >= cls.MACH_SUBSONIC:
-                return False  # NeuralFoil is trained on incompressible flow
-            if re > 1e7 or re < 1e4:
-                return False  # Outside training range
-            return True
-        
         elif solver in [SolverType.SU2_SA, SolverType.SU2_SST, 
                         SolverType.SU2_GAMMA_RETHETA]:
             # SU2 can handle any Re and Mach in this context
@@ -215,22 +198,6 @@ class SolverSelector:
                 'iter_limit': 100,
                 'viscous': True,
                 'compressible': False
-            }
-        
-        elif solver == SolverType.NEURALFOIL:
-            # NeuralFoil settings
-            if re < cls.RE_LOW:
-                ncrit = 5.0
-            elif re < 5e5:
-                ncrit = 7.5
-            else:
-                ncrit = 9.0
-            
-            return {
-                'ncrit': ncrit,
-                'model_size': 'xlarge',  # xlarge for good accuracy
-                'xtr_upper': 1.0,  # Natural transition
-                'xtr_lower': 1.0
             }
         
         elif solver == SolverType.SU2_SA:
@@ -305,7 +272,7 @@ def get_solver_availability() -> dict:
     
     Returns:
     --------
-    dict : {'xfoil': bool, 'neuralfoil': bool, 'su2': bool}
+    dict : {'xfoil': bool, 'su2': bool}
     """
     import subprocess
     
@@ -317,13 +284,6 @@ def get_solver_availability() -> dict:
         availability['xfoil'] = True
     except (FileNotFoundError, subprocess.TimeoutExpired):
         availability['xfoil'] = False
-    
-    # Check NeuralFoil
-    try:
-        import neuralfoil
-        availability['neuralfoil'] = True
-    except ImportError:
-        availability['neuralfoil'] = False
     
     # Check SU2
     try:

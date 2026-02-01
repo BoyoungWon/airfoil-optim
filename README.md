@@ -7,7 +7,6 @@ Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL 및 SU2
 - **다중 형상 매개변수화**: NACA (3 params), CST (8-30 params), FFD (15-100+ params)
 - **다중 CFD 솔버**:
   - **XFoil** (2D panel method) - Re 1e4~1e6, Mach < 0.5
-  - **NeuralFoil** (Neural network surrogate) - Fast predictions, XFoil fallback ⭐ NEW
   - **SU2 RANS** (SA/SST/Gamma-Re-theta) - Re > 1e6 or Mach ≥ 0.5
   - **자동 Solver 선택** - 조건에 따라 최적 solver 자동 선택
 - **Surrogate 모델**: Kriging/GPR, Neural Network, Polynomial RSM
@@ -30,10 +29,6 @@ python examples/demo_solver_selection.py
 python scripts/unified_analysis.py input/airfoil/naca0012.dat \
     --re 5e5 --mach 0.2 --aoa 5.0
 
-# NeuralFoil 사용 (빠른 예측)
-python scripts/unified_analysis.py input/airfoil/naca0012.dat \
-    --re 5e5 --mach 0.2 --aoa 5.0 --solver neuralfoil
-
 # High Re, transonic (SU2 SST 자동 선택)
 python scripts/unified_analysis.py input/airfoil/naca0012.dat \
     --re 3e6 --mach 0.75 --aoa 2.5
@@ -48,9 +43,9 @@ python scripts/unified_analysis.py input/airfoil/naca0012.dat \
 
 ## 📚 문서
 
-- **[docs/NEURALFOIL_TRAINING_GUIDE.md](docs/NEURALFOIL_TRAINING_GUIDE.md)** - NeuralFoil 학습 및 확장 가이드
+- **[ANALYSIS_GUIDE.md](ANALYSIS_GUIDE.md)** - XFoil 기본 사용법
+- **[MULTI_SOLVER_GUIDE.md](MULTI_SOLVER_GUIDE.md)** - 다중 solver 자동 선택 시스템 ⭐ NEW
 - **[examples/](examples/)** - 다양한 비행 조건 예시
-- **[scenarios/README.md](scenarios/README.md)** - 최적화 시나리오 설명
 
 ## 환경 구성
 
