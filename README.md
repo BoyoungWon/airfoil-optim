@@ -1,15 +1,56 @@
 # Airfoil Optimization Framework
 
-Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL 및 OpenFOAM을 사용한 공력 해석과 다양한 형상 매개변수화 방법(NACA, CST, FFD)을 지원하며, Kriging, Neural Network 등의 surrogate model을 활용한 효율적인 최적화를 제공합니다.
+Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL 및 SU2 RANS를 사용한 공력 해석과 다양한 형상 매개변수화 방법(NACA, CST, FFD)을 지원하며, Kriging, Neural Network 등의 surrogate model을 활용한 효율적인 최적화를 제공합니다.
 
-## 주요 기능
+## 🎯 주요 기능
 
 - **다중 형상 매개변수화**: NACA (3 params), CST (8-30 params), FFD (15-100+ params)
-- **CFD 솔버**: XFOIL (2D panel method), OpenFOAM (3D RANS/LES)
+- **다중 CFD 솔버**:
+  - **XFoil** (2D panel method) - Re 1e4~1e6, Mach < 0.5
+  - **NeuralFoil** (Neural network surrogate) - Fast predictions, XFoil fallback ⭐ NEW
+  - **SU2 RANS** (SA/SST/Gamma-Re-theta) - Re > 1e6 or Mach ≥ 0.5
+  - **자동 Solver 선택** - 조건에 따라 최적 solver 자동 선택
 - **Surrogate 모델**: Kriging/GPR, Neural Network, Polynomial RSM
 - **최적화 알고리즘**: SLSQP, NSGA-II, Bayesian Optimization
 - **다중 설계점 최적화**: 가중 평균 기반 multi-point optimization
 - **시나리오 기반 실행**: YAML 설정 파일로 간편한 최적화 실행
+
+## 🚀 빠른 시작
+
+### 1. Solver 가용성 확인
+
+```bash
+python examples/demo_solver_selection.py
+```
+
+### 2. 단일 해석 실행
+
+```bash
+# Low Re (XFoil 자동 선택)
+python scripts/unified_analysis.py input/airfoil/naca0012.dat \
+    --re 5e5 --mach 0.2 --aoa 5.0
+
+# NeuralFoil 사용 (빠른 예측)
+python scripts/unified_analysis.py input/airfoil/naca0012.dat \
+    --re 5e5 --mach 0.2 --aoa 5.0 --solver neuralfoil
+
+# High Re, transonic (SU2 SST 자동 선택)
+python scripts/unified_analysis.py input/airfoil/naca0012.dat \
+    --re 3e6 --mach 0.75 --aoa 2.5
+```
+
+### 3. AoA Sweep
+
+```bash
+python scripts/unified_analysis.py input/airfoil/naca0012.dat \
+    --re 1e6 --mach 0.3 --aoa-sweep -5 15 0.5
+```
+
+## 📚 문서
+
+- **[docs/NEURALFOIL_TRAINING_GUIDE.md](docs/NEURALFOIL_TRAINING_GUIDE.md)** - NeuralFoil 학습 및 확장 가이드
+- **[examples/](examples/)** - 다양한 비행 조건 예시
+- **[scenarios/README.md](scenarios/README.md)** - 최적화 시나리오 설명
 
 ## 환경 구성
 
@@ -23,31 +64,40 @@ Surrogate model 기반 airfoil 최적화 프레임워크입니다. XFOIL 및 Ope
 1. **Docker 이미지 빌드 및 컨테이너 시작**
 
 ```bash
-docker-compose up -d xfoil-dev
+# 첫 빌드 시 약 30분 소요 (SU2 컴파일 포함)
+docker-compose build
+docker-compose up -d
 ```
 
 2. **개발 컨테이너 접속**
 
 ```bash
-docker-compose exec xfoil-dev bash
+docker exec -it airfoil-optim bash
 ```
 
-3. **XFOIL 실행 확인**
+3. **솔버 확인**
 
 ```bash
+# XFoil
 xfoil
+
+# SU2
+SU2_CFD -h
+
+# NeuralFoil
+python -c "from neuralfoil.main import get_aero_from_dat_file; print('OK')"
 ```
 
 ### 서비스 구성
 
-**xfoil-dev**: XFOIL이 설치된 메인 개발 환경
+**airfoil**: XFoil, NeuralFoil, SU2가 모두 설치된 통합 개발 환경
 
 ```bash
 # 컨테이너 시작
-docker-compose up -d xfoil-dev
+docker-compose up -d
 
 # 컨테이너 접속
-docker-compose exec xfoil-dev bash
+docker exec -it airfoil-optim bash
 
 # 컨테이너 종료
 docker-compose down
@@ -57,42 +107,33 @@ docker-compose down
 
 ```
 .
+├── solvers/                 # 통합 솔버 패키지
+│   ├── __init__.py              # SolverType enum, 자동 선택
+│   ├── unified.py               # 통합 분석 인터페이스
+│   ├── xfoil_solver.py          # XFoil 솔버
+│   ├── neuralfoil_solver.py     # NeuralFoil 솔버
+│   ├── su2_solver.py            # SU2 RANS 솔버
+│   ├── su2/                     # SU2 설정 템플릿
+│   │   └── config_templates/    # 아음속/천음속/천이 설정
+│   └── tests/                   # 솔버 테스트
 ├── xfoil/                   # XFOIL 소스 코드
+├── SU2/                     # SU2 소스 코드 (v8.4.0)
+├── neuralfoil/              # NeuralFoil 소스 코드
 ├── scripts/                 # Python 스크립트
 │   ├── generate_naca_airfoil.py   # NACA airfoil 생성
 │   ├── ffd_airfoil.py             # FFD airfoil 생성
+│   ├── unified_analysis.py        # 통합 분석 CLI
+│   ├── solver_selector.py         # 솔버 자동 선택
 │   ├── optimize_airfoil.py        # 메인 최적화 스크립트
 │   ├── validate_scenario.py       # 시나리오 검증
 │   ├── run_cruise_wing.py         # Cruise Wing CLI
-│   ├── test_cruise_wing.py        # Cruise Wing 테스트
 │   ├── cruise_wing/               # Cruise Wing 전용 모듈
-│   │   ├── __init__.py            # 패키지 초기화
-│   │   ├── database.py            # NACA 데이터베이스
-│   │   ├── analyzer.py            # XFOIL 해석 인터페이스
-│   │   ├── kriging.py             # Kriging surrogate 모델
-│   │   ├── optimizer.py           # SLSQP 최적화
-│   │   ├── visualizer.py          # 결과 시각화
-│   │   ├── workflow.py            # 4-phase 워크플로우
-│   │   └── README.md              # 모듈 설명서
 │   └── optimize/                  # 최적화 모듈 (범용)
-│       ├── parametrization.py     # 형상 매개변수화 (NACA/CST/FFD)
-│       ├── surrogate.py           # Surrogate 모델
-│       └── xfoil_interface.py     # XFOIL 인터페이스
 ├── scenarios/               # 최적화 시나리오 (YAML)
-│   ├── cruise_wing.yaml           # 순항 익형 최적화 ✓ 구현완료
-│   ├── high_lift.yaml             # 고양력 익형 최적화
-│   ├── low_speed.yaml             # 저속 UAV 익형
-│   ├── propeller.yaml             # 프로펠러 익형
-│   ├── wind_turbine.yaml          # 풍력 터빈 익형
-│   └── control_surface.yaml       # 조종면 익형
 ├── output/                  # 프로젝트 산출물 (gitignore)
-│   ├── airfoil/             # 생성된 airfoil 형상
-│   ├── analysis/            # XFOIL 해석 결과
-│   ├── surrogate/           # Surrogate model 학습 결과
-│   └── optimization/        # 최적화 결과
 ├── public/airfoil/          # 공유 airfoil 저장소
 ├── environment.yml          # Conda 환경 설정
-├── Dockerfile               # Docker 이미지 정의
+├── Dockerfile               # 통합 Docker 이미지 (XFoil+NeuralFoil+SU2)
 ├── docker-compose.yml       # Docker Compose 설정
 └── README.md                # 본 문서
 ```
@@ -102,19 +143,20 @@ docker-compose down
 - **Base OS**: Ubuntu 22.04
 - **Fortran Compiler**: gfortran
 - **C/C++ Compiler**: gcc/g++
-- **Build System**: CMake
-- **Python**: 3.12 (Conda environment)
-- **Scientific Libraries**: NumPy, SciPy, MPI4py, Numba
+- **Build System**: CMake, Meson/Ninja (SU2)
+- **Python**: 3.11 (Conda environment)
+- **Scientific Libraries**: NumPy, SciPy, MPI4py, Numba, AeroSandbox
 - **CFD Solvers**:
-  - XFOIL (built from source) - 2D panel method
-  - OpenFOAM (optional, for 3D scenarios) - RANS/LES
+  - XFoil v6.97 (built from source) - 2D panel method
+  - NeuralFoil (neural network surrogate) - Fast predictions
+  - SU2 v8.4.0 "Harrier" (built from source) - RANS (SA/SST/γ-Re_θ)
 
 ## 빠른 시작
 
 ### 1. 시나리오 검증
 
 ```bash
-docker-compose exec xfoil-dev bash
+docker exec -it airfoil-optim bash
 
 # 모든 시나리오 검증
 python scripts/validate_scenario.py --all
@@ -261,7 +303,7 @@ ls output/optimization/cruise_wing_[timestamp]/
 ### NACA Airfoil 생성
 
 ```bash
-docker-compose exec xfoil-dev bash
+docker exec -it airfoil-optim bash
 
 # 단일 NACA airfoil 생성
 python scripts/generate_naca_airfoil.py 2412
@@ -407,36 +449,48 @@ python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
   - 3D 효과 무시
 - **권장 사용**: 고정익 2D 단면 최적화
 
-### 2. OpenFOAM (3D RANS/LES)
+### 2. SU2 RANS (압축성/천음속)
 
-**향후 구현**: Propeller, Wind Turbine
-
-- **적용 대상**: 3D 유동, 회전익, 복잡한 형상
+- **적용 대상**: 고 Re, 천음속, 압축성 유동
 - **난류 모델**:
-  - RANS: k-ω SST, Spalart-Allmaras
-  - LES: Smagorinsky, WALE
+  - SA (Spalart-Allmaras)
+  - k-ω SST
+  - γ-Re_θ (전이 모델)
 - **장점**:
-  - 3D 유동 정확
-  - 회전 효과 반영
-  - 복잡한 경계조건
+  - 압축성 유동 정확
+  - 충격파-경계층 상호작용
+  - 고 Reynolds 수 해석
 - **단점**:
-  - 느림 (10분-1시간/evaluation)
-  - 높은 계산 비용
-  - Surrogate 필수
-- **권장 사용**: 프로펠러, 풍력 터빈, 3D 날개
+  - XFoil 대비 느림 (분 단위)
+  - 메시 생성 필요
+  - 설정 복잡
+- **권장 사용**: 천음속 익형, 고속 항공기, Re > 1e7
+
+### 3. NeuralFoil (Neural Network Surrogate)
+
+- **적용 대상**: 빠른 예측, XFoil 대체
+- **장점**:
+  - 매우 빠름 (~100x faster than XFoil)
+  - 수렴 실패 없음
+  - 신뢰도 점수 제공
+- **단점**:
+  - 근사치 (정확 해 아님)
+  - Re 1e4-1e7, Mach < 0.5 제한
+- **권장 사용**: 초기 설계, 대규모 스크리닝
 
 ### 솔버 선택 가이드
 
-| 조건           | 추천 솔버    | 이유         |
-| -------------- | ------------ | ------------ |
-| 2D 익형 단면   | **XFOIL**    | 빠름, 정확   |
-| 3D 날개/회전익 | **OpenFOAM** | 3D 효과 필수 |
-| 빠른 반복      | **XFOIL**    | <1초/eval    |
-| 정밀 해석      | **OpenFOAM** | RANS/LES     |
-| Re < 50M       | **XFOIL**    | 신뢰 범위    |
-| 회전 유동      | **OpenFOAM** | 회전 프레임  |
-| 프로토타입     | **XFOIL**    | 1-2일 완료   |
-| 최종 검증      | **OpenFOAM** | 실제 조건    |
+| 조건           | 추천 솔버      | 이유              |
+| -------------- | -------------- | ----------------- |
+| 2D 익형 단면   | **XFoil**      | 빠름, 정확        |
+| 빠른 스크리닝  | **NeuralFoil** | 초고속, 안정      |
+| 빠른 반복      | **XFoil**      | <1초/eval         |
+| Re < 1e7       | **XFoil**      | 신뢰 범위         |
+| Re > 1e7       | **SU2**        | 고 Re 정확        |
+| Mach > 0.5     | **SU2**        | 압축성 필수       |
+| 천음속/충격파  | **SU2 SST**    | 충격파-BL 상호작용|
+| 전이 예측      | **SU2 γ-Re_θ** | 정밀 전이 위치    |
+| 프로토타입     | **NeuralFoil** | 즉시 결과         |
 
 ## 형상 매개변수화 방법
 
@@ -469,8 +523,8 @@ python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
 | `control_surface.yaml` | 조종면   | NACA (3)    | XFOIL    | Kriging    | SLSQP     | effectiveness | 계획중     |
 | `high_lift.yaml`       | 고정익   | CST (12-20) | XFOIL    | Neural Net | NSGA-II   | max CL_max    | 계획중     |
 | `low_speed.yaml`       | 고정익   | CST (8-16)  | XFOIL    | Kriging    | NSGA-II   | max CL^1.5/CD | 계획중     |
-| `propeller.yaml`       | 회전익   | FFD (30-60) | OpenFOAM | Neural Net | NSGA-II   | multi-point   | 계획중     |
-| `wind_turbine.yaml`    | 회전익   | CST (20-30) | OpenFOAM | Neural Net | NSGA-II   | max AEP       | 계획중     |
+| `propeller.yaml`       | 회전익   | FFD (30-60) | SU2      | Neural Net | NSGA-II   | multi-point   | 계획중     |
+| `wind_turbine.yaml`    | 회전익   | CST (20-30) | SU2      | Neural Net | NSGA-II   | max AEP       | 계획중     |
 
 ## 필요 패키지
 
@@ -485,10 +539,6 @@ python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
 
 # 최적화 알고리즘
 - pymoo         # NSGA-II, NSGA-III (다목적 최적화)
-
-# OpenFOAM interface (향후 추가)
-- PyFoam (pip)  # OpenFOAM Python 래퍼
-- foampy (pip)  # OpenFOAM 후처리
 ```
 
 ### 향후 시나리오용 추가 패키지
@@ -497,13 +547,6 @@ python scripts/optimize_airfoil.py --scenario scenarios/my_custom.yaml
 # Neural Network surrogate
 pip install torch
 conda install -c conda-forge pytorch
-
-# OpenFOAM (3D scenarios)
-# OpenFOAM은 Dockerfile에서 설치 또는
-sudo apt-get install openfoam
-
-# OpenFOAM Python tools
-pip install PyFoam foampy
 ```
 
 ## 문제 해결

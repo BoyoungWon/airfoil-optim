@@ -100,12 +100,16 @@ def aoa_sweep(airfoil_file, reynolds, aoa_min, aoa_max, d_aoa,
     
     # Check if airfoil file exists
     if not airfoil_path.exists():
-        # Try looking in public/airfoil directory
-        alt_path = Path("public/airfoil") / airfoil_path.name
+        # Try looking in input/airfoil directory first
+        alt_path = Path("input/airfoil") / airfoil_path.name
         if alt_path.exists():
             airfoil_path = alt_path
+        # Then try public/airfoil directory
+        elif (Path("public/airfoil") / airfoil_path.name).exists():
+            airfoil_path = Path("public/airfoil") / airfoil_path.name
         else:
             print(f"✗ Error: Airfoil file not found: {airfoil_file}")
+            print(f"  Searched in: {airfoil_file}, input/airfoil/, public/airfoil/")
             return None, None
     
     # Create output directory
@@ -129,18 +133,29 @@ def aoa_sweep(airfoil_file, reynolds, aoa_min, aoa_max, d_aoa,
     print("="*70)
     
     # Create XFOIL command script
+    # Note: NORM command normalizes the airfoil coordinates if needed
+    # VPAR N sets ncrit, then blank line returns to main OPER menu
+    airfoil_abs = str(airfoil_path.absolute())
+    polar_abs = str(polar_file.absolute())
+    dump_abs = str(dump_file.absolute())
+    
     xfoil_commands = f"""PLOP
 G
 
-LOAD
-{airfoil_path.absolute()}
+LOAD {airfoil_abs}
+NORM
+PANE
 
 OPER
 VISC {reynolds}
 ITER {iter_limit}
+VPAR
+N
+{ncrit}
+
 PACC
-{polar_file.absolute()}
-{dump_file.absolute()}
+{polar_abs}
+{dump_abs}
 ASEQ {aoa_min} {aoa_max} {d_aoa}
 
 QUIT

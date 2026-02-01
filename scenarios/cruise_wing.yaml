@@ -161,7 +161,7 @@ solver:
 
   settings:
     ncrit: 8 # Critical amplification factor (비행 조건)
-    n_panels: 240 # Panel 수 (정확도 vs 속도)
+    n_panels: 240 # Panel 수
     max_iter: 300 # 최대 반복 횟수
 
   # Ncrit 가이드라인
@@ -181,6 +181,7 @@ solver:
 # ============================================================================
 surrogate:
   method: "kriging" # Gaussian Process Regression
+  training_samples: 80 # Total training samples (3 variables × ~25 samples/variable)
 
   settings:
     kernel: "matern" # Matérn 5/2 kernel (smooth, differentiable)
@@ -211,9 +212,9 @@ surrogate:
 optimization:
   algorithm: "scipy"
   method: "SLSQP" # Sequential Least Squares Programming
+  max_iterations: 50 # 최대 반복 횟수
 
   settings:
-    max_iterations: 50 # 최대 반복 횟수
     convergence_tol: 1.0e-6 # 수렴 조건
     eps: 1.0e-8 # Finite difference step
     n_multistart: 5 # Multi-start 횟수

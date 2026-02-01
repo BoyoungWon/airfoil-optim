@@ -1,23 +1,57 @@
+# =============================================================================
+# Airfoil Optimization - Docker Compose
+# =============================================================================
+# 
+# Build:   docker-compose build
+# Start:   docker-compose up -d
+# Shell:   docker-compose exec airfoil bash
+# Stop:    docker-compose down
+# Logs:    docker-compose logs -f
+#
+# =============================================================================
+
 services:
-  # Main development environment with xfoil
-  xfoil-dev:
+  airfoil:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: airfoil-optim-dev
+    image: airfoil-optim:latest
+    container_name: airfoil-optim
+    
     volumes:
+      # Mount workspace (code changes reflected immediately)
       - .:/workspace
-      - ./output:/workspace/output # 최적화 결과 저장
+      # Persist output data
+      - ./output:/workspace/output
+      # Persist input data
+      - ./input:/workspace/input
+    
     environment:
+      # Python path
+      - PYTHONPATH=/workspace:/workspace/scripts:/workspace/solvers
+      # XFoil
+      - XFOIL_PATH=/usr/local/bin/xfoil
+      # SU2
+      - SU2_RUN=/usr/local/bin
+      - SU2_HOME=/opt/su2
+      # MPI (allow root in container)
       - OMPI_ALLOW_RUN_AS_ROOT=1
       - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-      - PYTHONPATH=/workspace/scripts # Python 모듈 경로
-      - XFOIL_PATH=/usr/local/bin/xfoil # XFOIL 실행파일 경로
+    
+    # Keep container running
     stdin_open: true
     tty: true
     working_dir: /workspace
+    
+    # Resource limits (optional, adjust as needed)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4'
+    #       memory: 8G
+    
     command: /bin/bash
 
 networks:
   default:
-    name: airfoil-optim-network
+    name: airfoil-network

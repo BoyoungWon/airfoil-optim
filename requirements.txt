@@ -1,0 +1,38 @@
+# Airfoil Optimization Framework - Python Dependencies
+# 
+# Installation:
+#   pip install -r requirements.txt
+#
+# For local NeuralFoil development:
+#   pip install -e neuralfoil/
+
+# Core scientific computing
+numpy>=1.26.0,<2.4
+scipy>=1.12.0
+pandas>=2.0.0
+
+# Plotting and visualization
+matplotlib>=3.8.0
+
+# Aerodynamics - NeuralFoil dependencies
+aerosandbox>=4.2.0
+torch>=2.0.0
+
+# Optimization
+pymoo>=0.6.0              # Multi-objective optimization (NSGA-II, NSGA-III)
+scikit-learn>=1.3.0       # Surrogate models (Kriging/GPR)
+
+# Configuration and utilities
+pyyaml>=6.0               # YAML config parsing
+tqdm>=4.65.0              # Progress bars
+joblib>=1.3.0             # Model serialization
+
+# Mesh and geometry
+meshio>=5.3.0             # Mesh file I/O
+
+# Optional: Parallel computing (for SU2)
+mpi4py>=3.1.0             # MPI interface (requires system MPI)
+
+# Optional: Advanced features
+# ray>=2.8.0              # Distributed computing (heavy dependency)
+# polars>=0.18.0          # Fast dataframes (optional)

@@ -208,6 +208,7 @@ __marimo__/+
 
 # Generated airfoil files and outputs
 public/airfoil/*.dat
+input/airfoil/*.dat
 output/
 samples/
 test_ffd_output/
@@ -217,3 +218,7 @@ test_ffd_*.dat
 
 # Simulation results
 results/
+
+# XFoil build artifacts
+xfoil/bin/xfoil
+xfoil/build/

@@ -121,13 +121,35 @@ class ScenarioValidator:
             # Value ranges
             if 'reynolds' in dp:
                 Re = dp['reynolds']
-                if Re < 1e4 or Re > 1e7:
-                    self.warnings.append(f"design_points[{i}]: unusual Reynolds number {Re}")
+                # Handle string scientific notation (YAML 1.2 compatibility)
+                if isinstance(Re, str):
+                    try:
+                        Re = float(Re)
+                    except (ValueError, TypeError):
+                        self.errors.append(f"design_points[{i}]: reynolds must be a number, got '{Re}'")
+                        Re = None
+                
+                if isinstance(Re, (int, float)):
+                    if Re < 1e4 or Re > 1e7:
+                        self.warnings.append(f"design_points[{i}]: unusual Reynolds number {Re}")
+                elif Re is not None:
+                    self.errors.append(f"design_points[{i}]: reynolds must be a number, got {type(Re).__name__}")
             
             if 'aoa' in dp:
                 aoa = dp['aoa']
-                if aoa < -10 or aoa > 20:
-                    self.warnings.append(f"design_points[{i}]: unusual AoA {aoa}°")
+                # Handle string scientific notation (YAML 1.2 compatibility)
+                if isinstance(aoa, str):
+                    try:
+                        aoa = float(aoa)
+                    except (ValueError, TypeError):
+                        self.errors.append(f"design_points[{i}]: aoa must be a number, got '{aoa}'")
+                        aoa = None
+                
+                if isinstance(aoa, (int, float)):
+                    if aoa < -10 or aoa > 20:
+                        self.warnings.append(f"design_points[{i}]: unusual AoA {aoa}°")
+                elif aoa is not None:
+                    self.errors.append(f"design_points[{i}]: aoa must be a number, got {type(aoa).__name__}")
         
         if abs(total_weight - 1.0) > 0.01:
             self.warnings.append(f"design_points weights sum to {total_weight}, not 1.0")

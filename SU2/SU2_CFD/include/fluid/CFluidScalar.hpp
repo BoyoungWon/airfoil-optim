@@ -1,0 +1,183 @@
+/*!
+ * \file CFluidScalar.hpp
+ * \brief  Defines the multicomponent incompressible Ideal Gas model for mixtures.
+ * \author T. Economon, Mark Heimgartner, Cristopher Morales Ubal
+ * \version 8.4.0 "Harrier"
+ *
+ * SU2 Project Website: https://su2code.github.io
+ *
+ * The SU2 Project is maintained by the SU2 Foundation
+ * (http://su2foundation.org)
+ *
+ * Copyright 2012-2026, SU2 Contributors (cf. AUTHORS.md)
+ *
+ * SU2 is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SU2 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with SU2. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include <memory>
+#include <array>
+
+#include "CFluidModel.hpp"
+
+/*!
+ * \class CFluidScalar
+ * \brief Child class for defining an incompressible ideal gas model.
+ * \author: T. Economon
+ */
+class CFluidScalar final : public CFluidModel {
+ private:
+  const int n_species_mixture;            /*!< \brief Number of species in mixture. */
+  su2double Gas_Constant;                 /*!< \brief Specific gas constant. */
+  const su2double Pressure_Thermodynamic; /*!< \brief Constant pressure thermodynamic. */
+  const su2double GasConstant_Ref;        /*!< \brief Gas constant reference needed for Nondimensional problems. */
+  const su2double Std_Ref_Temp_ND;        /*!< \brief Nondimensional standard reference temperature for enthalpy. */
+  const su2double Prandtl_Turb_Number;    /*!< \brief Prandlt turbulent number.*/
+  const su2double Schmidt_Turb_Number;    /*!< \brief Schmidt turbulent number.*/
+
+  const bool wilke;
+  const bool davidson;
+
+  static constexpr int ARRAYSIZE = 16;
+
+  std::array<su2double, ARRAYSIZE> massFractions;              /*!< \brief Mass fractions of all species. */
+  std::array<su2double, ARRAYSIZE> moleFractions;              /*!< \brief Mole fractions of all species. */
+  std::array<su2double, ARRAYSIZE> molarMasses;                /*!< \brief Molar masses of all species. */
+  std::array<su2double, ARRAYSIZE> specificHeat;               /*!< \brief Specific Heat capacities of all species. */
+  std::array<su2double, ARRAYSIZE> laminarViscosity;           /*!< \brief Laminar viscosity of all species. */
+  std::array<su2double, ARRAYSIZE> laminarThermalConductivity; /*!< \brief Laminar thermal conductivity of all species. */
+  std::array<su2double, ARRAYSIZE> massDiffusivity;           /*!< \brief mass diffusivity of all species. */
+
+  std::unique_ptr<CViscosityModel> LaminarViscosityPointers[ARRAYSIZE];
+  std::unique_ptr<CConductivityModel> ThermalConductivityPointers[ARRAYSIZE];
+  std::unique_ptr<CDiffusivityModel> MassDiffusivityPointers[ARRAYSIZE];
+
+  /*!
+   * \brief Convert mass fractions to mole fractions.
+   * \param[in] val_scalars - Scalar mass fraction.
+   */
+  void MassToMoleFractions(const su2double* val_scalars);
+
+  /*!
+   * \brief Wilke mixing law for mixture viscosity.
+   * \param[in] val_scalars - Scalar mass fraction.
+   */
+  su2double WilkeViscosity(const su2double* val_scalars);
+
+  /*!
+   * \brief Davidson mixing law for mixture viscosity.
+   * \param[in] val_scalars - Scalar mass fraction.
+   */
+  su2double DavidsonViscosity(const su2double* val_scalars);
+
+  /*!
+   * \brief Wilke mixing law for mixture thermal conductivity.
+   * \param[in] val_scalars - Scalar mass fraction.
+   */
+  su2double WilkeConductivity(const su2double* val_scalars);
+
+  /*!
+   * \brief Get fluid mean specific heat capacity at constant pressure.
+   */
+  su2double ComputeMeanSpecificHeatCp(const su2double* val_scalars);
+
+  /*!
+   * \brief Compute Enthalpy given the temperature and scalars.
+   */
+  su2double ComputeEnthalpyFromT(const su2double val_temperature, const su2double* val_scalars);
+
+  /*!
+   * \brief Compute gas constant for mixture.
+   */
+  su2double ComputeGasConstant();
+
+  /*!
+   * \brief Compute mass diffusivity for species.
+   */
+  void ComputeMassDiffusivity();
+
+ public:
+  /*!
+   * \brief Constructor of the class.
+   */
+  CFluidScalar(su2double val_operating_pressure, const CConfig* config);
+
+  /*!
+   * \brief Set viscosity model.
+   */
+  void SetLaminarViscosityModel(const CConfig* config) override;
+
+  /*!
+   * \brief Set thermal conductivity model.
+   */
+  void SetThermalConductivityModel(const CConfig* config) override;
+
+  /*!
+   * \brief Set mass diffusivity model.
+   */
+  void SetMassDiffusivityModel(const CConfig* config) override;
+
+  /*!
+   * \brief Get fluid laminar viscosity.
+   */
+  inline su2double GetLaminarViscosity() override { return Mu; }
+
+  /*!
+   * \brief Get fluid thermal conductivity.
+   */
+  inline su2double GetThermalConductivity() override { return Kt + Mu_Turb * Cp / Prandtl_Turb_Number; }
+
+  /*!
+   * \brief Get fluid mass diffusivity.
+   */
+  inline su2double GetMassDiffusivity(int ivar) override { return massDiffusivity[ivar]; }
+
+  /*!
+   * \brief Get the enthalpy diffusivity terms for all species being solved.
+   *
+   * This function computes and retrieves the enthalpy diffusion terms required in the energy equation
+   * for multicomponent flows.
+   *
+   * \param[in,out] enthalpy_diffusions - Array containing the enthalpy diffusion terms for all
+   * species to be solved. The size of \p enthalpy_diffusions must be at least (n_species_mixture - 1),
+   * corresponding to the number of species transport equations in the system.
+   */
+  void GetEnthalpyDiffusivity(su2double* enthalpy_diffusions) const override;
+
+  /*!
+   * \brief Get the gradient of enthalpy diffusivity terms for all species being solved.
+   *
+   * This function computes and retrieves the gradient of the enthalpy diffusion terms with respect to temperature.
+   * These terms are required for implicit computations when solving the energy equation for multicomponent flows.
+   *
+   * \param[in,out] grad_enthalpy_diffusions - Array containing the gradient of enthalpy diffusion terms for all
+   * species to be solved. The size of \p grad_enthalpy_diffusions must be at least (n_species_mixture - 1),
+   * corresponding to the number of species transport equations in the system.
+   */
+  void GetGradEnthalpyDiffusivity(su2double* grad_enthalpy_diffusions) const override;
+
+  /*!
+   * \brief Set the Dimensionless State using Temperature.
+   * \param[in] t - Temperature value at the point.
+   */
+  void SetTDState_T(su2double val_temperature, const su2double* val_scalars) override;
+
+  /*!
+   * \brief Virtual member.
+   * \param[in] val_enthalpy - Enthalpy value at the point.
+   * \param[in] val_scalars - Scalar mass fractions.
+   */
+  void SetTDState_h(su2double val_enthalpy, const su2double* val_scalars = nullptr) override;
+};

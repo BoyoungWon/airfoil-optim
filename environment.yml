@@ -1,24 +1,61 @@
-name: airfoil-optim-env
+# Airfoil Optimization - Conda Environment
+# 
+# Create: conda env create -f environment.yml
+# Activate: conda activate airfoil-optim
+# Update: conda env update -f environment.yml --prune
+
+name: airfoil-optim
 channels:
   - conda-forge
+  - defaults
+
 dependencies:
-  - python=3.12
-  - numpy=2.3.5
-  - scipy=1.16.3
-  - pandas
-  - mpi4py=4.1.1
-  - meshio=5.3.5
-  - numba=0.62.1
-  - pip=25.3
-  - fftw
-  - openmpi
+  # Python version
+  - python=3.11
+  
+  # Core scientific computing
+  - numpy>=1.26
+  - scipy>=1.12
+  - pandas>=2.0
+  
+  # Plotting
+  - matplotlib>=3.8
+  
+  # Optimization
+  - scikit-learn>=1.3    # Surrogate models (Kriging/GPR)
+  
+  # Configuration
+  - pyyaml>=6.0
+  - joblib>=1.3
+  
+  # Mesh I/O
+  - meshio>=5.3
+  
+  # Build tools (for XFoil compilation)
+  - cmake>=3.20
+  - make
+  - gfortran
+  
+  # MPI (for SU2)
+  - openmpi>=4.1
+  - mpi4py>=3.1
+  
+  # Linear algebra
   - openblas
   - lapack
-  # Cruise Wing 최적화 모듈
-  - scikit-learn # Kriging/GPR surrogate model
-  - matplotlib # 시각화
-  - pyyaml # YAML 설정 파일 파싱
-  - joblib # 모델 직렬화
-  # 최적화 알고리즘
-  - pymoo # NSGA-II, NSGA-III 등 다목적 최적화
-  # OpenFOAM interface (PyFoam 등은 pip로 설치)
+  
+  # Pip for additional packages
+  - pip>=23.0
+  
+  # Pip-only packages
+  - pip:
+    # NeuralFoil dependencies
+    - aerosandbox>=4.2.0
+    - torch>=2.0.0
+    - tqdm>=4.65.0
+    
+    # Multi-objective optimization
+    - pymoo>=0.6.0
+    
+    # Note: NeuralFoil is installed separately in Dockerfile
+    # For local development: pip install -e ./neuralfoil
